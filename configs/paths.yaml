@@ -1,0 +1,4 @@
+# Relative data/output paths given to the CLIs (e.g. data/mock, outputs/state)
+# resolve under this root. The repo is in OneDrive, so keep artifacts on a local disk.
+# Override with the GO2WM_ROOT environment variable.
+root: D:/go2wm

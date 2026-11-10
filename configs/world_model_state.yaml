@@ -1,0 +1,27 @@
+# State-only action-conditioned delta dynamics (spec section 7).
+data:
+  manifest: default
+  split_seed: 0
+  val_frac: 0.15
+  test_frac: 0.15
+  holdout_families: []     # e.g. [slippery] for a held-out-family generalization test
+  history: 4               # K past observations (0.4 s at 10 Hz)
+  horizon_train: 10        # open-loop steps in the rollout loss (1 s)
+  stride: 1
+  eval_horizons_s: [0.5, 1.0, 2.0, 3.0]
+
+model:
+  type: mlp                # mlp | gru | kinematic_command | kinematic_constant_velocity
+  hidden: 256
+  layers: 3
+
+train:
+  seed: 0
+  device: auto
+  epochs: 40
+  batch_size: 256
+  lr: 1.0e-3
+  weight_decay: 1.0e-5
+  grad_clip: 1.0
+  rollout_weight: 0.5      # weight of open-loop steps >0 relative to the one-step term
+  huber_delta: 1.0

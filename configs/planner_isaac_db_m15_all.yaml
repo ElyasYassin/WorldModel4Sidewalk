@@ -1,0 +1,8 @@
+# E3e: deadband-aware MPC + 0.15 m clearance margin on all 51 E3b scenes (confirmatory, not cherry-picked).
+_base_: planner_isaac_db.yaml
+mpc:
+  weights:
+    clearance_margin_m: 0.15
+navigation:
+  scenarios:
+    families: [open, obstacles, sidewalk]

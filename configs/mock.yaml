@@ -1,0 +1,30 @@
+# Mock backend: deterministic smoke-test dynamics. NOT Go2 physics.
+backend: mock
+mock:
+  control_dt: 0.1
+  physics_dt: 0.01
+  dt_jitter_s: 0.002
+  action_latency_s: 0.001
+  robot_radius: 0.3
+  tau_lin_s: 0.20
+  tau_yaw_s: 0.15
+  process_noise: 0.02
+  obs_noise: 0.01
+  families: [open, obstacles, sidewalk, slippery]
+
+collect:
+  episodes: 20
+  max_steps: 300          # 30 s at 10 Hz
+  base_seed: 0
+  goal_tolerance_m: 0.5
+  # command bounds used by the exploration generator (body frame)
+  limits:
+    vx: [-0.4, 1.0]
+    vy: [-0.4, 0.4]
+    yaw_rate: [-1.2, 1.2]
+  exploration:
+    p_random: 0.45
+    p_goal: 0.45
+    p_stop: 0.10
+    hold_s: [0.5, 2.5]
+    smoothing: 0.5

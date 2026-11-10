@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "go2wm"
+version = "0.1.0"
+description = "Action-conditioned latent world model + hybrid planner for Unitree Go2 (simulation-first)"
+requires-python = ">=3.10"
+# Versions verified in the IsaacLab conda env (see docs/INSTALL.md).
+dependencies = [
+    "numpy>=1.26,<2",
+    "torch>=2.7",
+    "PyYAML>=6.0",
+    "matplotlib>=3.8",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+vision = ["transformers>=5.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

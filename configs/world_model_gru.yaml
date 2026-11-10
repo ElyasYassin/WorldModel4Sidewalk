@@ -1,0 +1,5 @@
+_base_: world_model_state.yaml
+model:
+  type: gru
+  hidden: 128
+  layers: 1

@@ -1,0 +1,5 @@
+# E2b: same model as world_model_state.yaml, trained on the enlarged Isaac dataset
+# (seeds 0-179) with a fresh scene-disjoint split, so there are ~27 test episodes instead of 9.
+_base_: world_model_state.yaml
+data:
+  manifest: v2

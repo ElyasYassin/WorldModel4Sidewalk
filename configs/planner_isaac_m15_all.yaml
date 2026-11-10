@@ -1,0 +1,5 @@
+# E3e ablation: 0.15 m clearance margin WITHOUT the deadband projection, all 51 scenes.
+_base_: planner_isaac.yaml
+mpc:
+  weights:
+    clearance_margin_m: 0.15

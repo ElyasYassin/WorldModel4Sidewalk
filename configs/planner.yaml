@@ -1,0 +1,54 @@
+# Hybrid planning: A* global waypoints + local controller (spec section 9).
+control_dt: 0.1
+robot_radius: 0.3
+
+# Hard bounds on commanded body-frame velocity. For Isaac these must stay within the
+# locomotion policy's trained command ranges (see configs/isaac_go2.yaml).
+limits:
+  vx: [-0.3, 0.9]
+  vy: [-0.3, 0.3]
+  yaw_rate: [-1.2, 1.2]
+
+safety:
+  max_accel: [2.0, 2.0, 4.0]     # per-second change limits for vx, vy, yaw_rate
+  stop_clearance_m: 0.05
+
+navigation:
+  grid_resolution: 0.1
+  inflation_margin: 0.15         # added to robot_radius for the A* map
+  waypoint_spacing: 1.0
+  waypoint_tolerance: 0.6
+  goal_tolerance: 0.5
+  max_steps: 400                 # 40 s
+  stall_speed: 0.05
+  stall_steps: 20
+  max_reroutes: 3
+  scenarios:                     # identical for every planner
+    base_seed: 10000             # disjoint from data-collection seeds
+    per_family: 5
+    families: [open, obstacles, sidewalk, slippery]
+
+mpc:
+  horizon: 15                    # 1.5 s
+  samples: 256
+  elites: 24
+  iterations: 4
+  init_std: [0.4, 0.2, 0.6]
+  min_std: 0.02
+  device: cpu
+  weights:
+    goal: 1.0
+    running_goal: 0.2
+    heading: 0.3
+    collision: 30.0              # geometric clearance from the known map (not learned)
+    clearance_margin_m: 0.3
+    smooth: 0.05
+    effort: 0.01
+    infeasible_penalty: 1000.0
+
+reactive:
+  v_max: 0.8
+  k_yaw: 1.8
+  influence_m: 1.0
+  k_rep: 1.2
+  slow_m: 0.6

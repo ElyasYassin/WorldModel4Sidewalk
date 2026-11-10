@@ -1,0 +1,11 @@
+# E3c: Isaac MPC with a deadband-aware action set. Planar commands the pretrained flat Go2 policy
+# ignores (< ~0.2 m/s; measured from data/go2_sim, see docs/EXPERIMENTS.md E3c) are never proposed.
+_base_: planner_isaac.yaml
+mpc:
+  deadband:
+    enabled: true
+    planar_snap: 0.1   # below: pure stop
+    planar_min: 0.4    # [snap, min): rescaled to this speed
+navigation:
+  scenarios:
+    families: [obstacles, sidewalk]   # where every E3a/E3b failure happened

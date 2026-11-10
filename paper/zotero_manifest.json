@@ -1,0 +1,3832 @@
+[
+  {
+    "itemType": "preprint",
+    "title": "Legged Locomotion in Challenging Terrains using Egocentric Vision",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Ananye",
+        "lastName": "Agarwal"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ashish",
+        "lastName": "Kumar"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jitendra",
+        "lastName": "Malik"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Deepak",
+        "lastName": "Pathak"
+      }
+    ],
+    "date": "2022-11-14",
+    "abstractNote": "Animals are capable of precise and agile locomotion using vision. Replicating this ability has been a long-standing goal in robotics. The traditional approach has been to decompose this problem into elevation mapping and foothold planning phases. The elevation mapping, however, is susceptible to failure and large noise artifacts, requires specialized hardware, and is biologically implausible. In this paper, we present the first end-to-end locomotion system capable of traversing stairs, curbs, stepping stones, and gaps. We show this result on a medium-sized quadruped robot using a single front-facing depth camera. The small size of the robot necessitates discovering specialized gait patterns not seen elsewhere. The egocentric camera requires the policy to remember past information to estimate the terrain under its hind feet. We train our policy in simulation. Training has two phases - first, we train a policy using reinforcement learning with a cheap-to-compute variant of depth image and then in phase 2 distill it into the final policy that uses depth using supervised learning. The resulting policy transfers to the real world and is able to run in real-time on the limited compute of the robot. It can traverse a large variety of terrain while being robust to perturbations like pushes, slippery surfaces, and rocky terrain. Videos are at https://vision-locomotion.github.io",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2211.07638",
+    "url": "https://arxiv.org/abs/2211.07638",
+    "DOI": "",
+    "arxiv": "2211.07638",
+    "source": "arxiv",
+    "key": "agarwal2022egocentric",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "H9UH5833"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Self-Supervised Learning from Images with a Joint-Embedding Predictive Architecture",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Mahmoud",
+        "lastName": "Assran"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Quentin",
+        "lastName": "Duval"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ishan",
+        "lastName": "Misra"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Piotr",
+        "lastName": "Bojanowski"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Pascal",
+        "lastName": "Vincent"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Michael",
+        "lastName": "Rabbat"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Yann",
+        "lastName": "LeCun"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Nicolas",
+        "lastName": "Ballas"
+      }
+    ],
+    "date": "2023-01-19",
+    "abstractNote": "This paper demonstrates an approach for learning highly semantic image representations without relying on hand-crafted data-augmentations. We introduce the Image-based Joint-Embedding Predictive Architecture (I-JEPA), a non-generative approach for self-supervised learning from images. The idea behind I-JEPA is simple: from a single context block, predict the representations of various target blocks in the same image. A core design choice to guide I-JEPA towards producing semantic representations is the masking strategy; specifically, it is crucial to (a) sample target blocks with sufficiently large scale (semantic), and to (b) use a sufficiently informative (spatially distributed) context block. Empirically, when combined with Vision Transformers, we find I-JEPA to be highly scalable. For instance, we train a ViT-Huge/14 on ImageNet using 16 A100 GPUs in under 72 hours to achieve strong downstream performance across a wide range of tasks, from linear classification to object counting and depth prediction.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2301.08243",
+    "url": "https://arxiv.org/abs/2301.08243",
+    "DOI": "",
+    "arxiv": "2301.08243",
+    "source": "arxiv",
+    "key": "assran2023ijepa",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "NI9JAHKS"
+  },
+  {
+    "itemType": "preprint",
+    "title": "V-JEPA 2: Self-Supervised Video Models Enable Understanding, Prediction and Planning",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Mido",
+        "lastName": "Assran"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Adrien",
+        "lastName": "Bardes"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "David",
+        "lastName": "Fan"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Quentin",
+        "lastName": "Garrido"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Russell",
+        "lastName": "Howes"
+      },
+      {
+        "creatorType": "author",
+        "name": "Mojtaba"
+      },
+      {
+        "creatorType": "author",
+        "name": "Komeili"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Matthew",
+        "lastName": "Muckley"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ammar",
+        "lastName": "Rizvi"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Claire",
+        "lastName": "Roberts"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Koustuv",
+        "lastName": "Sinha"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Artem",
+        "lastName": "Zholus"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Sergio",
+        "lastName": "Arnaud"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Abha",
+        "lastName": "Gejji"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ada",
+        "lastName": "Martin"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Francois Robert",
+        "lastName": "Hogan"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Daniel",
+        "lastName": "Dugas"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Piotr",
+        "lastName": "Bojanowski"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Vasil",
+        "lastName": "Khalidov"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Patrick",
+        "lastName": "Labatut"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Francisco",
+        "lastName": "Massa"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Marc",
+        "lastName": "Szafraniec"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Kapil",
+        "lastName": "Krishnakumar"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Yong",
+        "lastName": "Li"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Xiaodong",
+        "lastName": "Ma"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Sarath",
+        "lastName": "Chandar"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Franziska",
+        "lastName": "Meier"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Yann",
+        "lastName": "LeCun"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Michael",
+        "lastName": "Rabbat"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Nicolas",
+        "lastName": "Ballas"
+      }
+    ],
+    "date": "2025-06-11",
+    "abstractNote": "A major challenge for modern AI is to learn to understand the world and learn to act largely by observation. This paper explores a self-supervised approach that combines internet-scale video data with a small amount of interaction data (robot trajectories), to develop models capable of understanding, predicting, and planning in the physical world. We first pre-train an action-free joint-embedding-predictive architecture, V-JEPA 2, on a video and image dataset comprising over 1 million hours of internet video. V-JEPA 2 achieves strong performance on motion understanding (77.3 top-1 accuracy on Something-Something v2) and state-of-the-art performance on human action anticipation (39.7 recall-at-5 on Epic-Kitchens-100) surpassing previous task-specific models. Additionally, after aligning V-JEPA 2 with a large language model, we demonstrate state-of-the-art performance on multiple video question-answering tasks at the 8 billion parameter scale (e.g., 84.0 on PerceptionTest, 76.9 on TempCompass). Finally, we show how self-supervised learning can be applied to robotic planning tasks by post-training a latent action-conditioned world model, V-JEPA 2-AC, using less than 62 hours of unlabeled robot videos from the Droid dataset. We deploy V-JEPA 2-AC zero-shot on Franka arms in two different labs and enable picking and placing of objects using planning with image goals. Notably, this is achieved without collecting any data from the robots in these environments, and without any task-specific training or reward. This work demonstrates how self-supervised learning from web-scale data and a small amount of robot interaction data can yield a world model capable of planning in the physical world.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2506.09985",
+    "url": "https://arxiv.org/abs/2506.09985",
+    "DOI": "",
+    "arxiv": "2506.09985",
+    "source": "arxiv",
+    "key": "assran2025vjepa2",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "Z4T2P9IZ"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Navigation World Models",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Amir",
+        "lastName": "Bar"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Gaoyue",
+        "lastName": "Zhou"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Danny",
+        "lastName": "Tran"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Trevor",
+        "lastName": "Darrell"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Yann",
+        "lastName": "LeCun"
+      }
+    ],
+    "date": "2024-12-04",
+    "abstractNote": "Navigation is a fundamental skill of agents with visual-motor capabilities. We introduce a Navigation World Model (NWM), a controllable video generation model that predicts future visual observations based on past observations and navigation actions. To capture complex environment dynamics, NWM employs a Conditional Diffusion Transformer (CDiT), trained on a diverse collection of egocentric videos of both human and robotic agents, and scaled up to 1 billion parameters. In familiar environments, NWM can plan navigation trajectories by simulating them and evaluating whether they achieve the desired goal. Unlike supervised navigation policies with fixed behavior, NWM can dynamically incorporate constraints during planning. Experiments demonstrate its effectiveness in planning trajectories from scratch or by ranking trajectories sampled from an external policy. Furthermore, NWM leverages its learned visual priors to imagine trajectories in unfamiliar environments from a single input image, making it a flexible and powerful tool for next-generation navigation systems.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2412.03572",
+    "url": "https://arxiv.org/abs/2412.03572",
+    "DOI": "",
+    "arxiv": "2412.03572",
+    "source": "arxiv",
+    "key": "bar2025nwm",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "4GNGU386"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Deep Reinforcement Learning in a Handful of Trials using Probabilistic Dynamics Models",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Kurtland",
+        "lastName": "Chua"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Roberto",
+        "lastName": "Calandra"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Rowan",
+        "lastName": "McAllister"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Sergey",
+        "lastName": "Levine"
+      }
+    ],
+    "date": "2018-05-30",
+    "abstractNote": "Model-based reinforcement learning (RL) algorithms can attain excellent sample efficiency, but often lag behind the best model-free algorithms in terms of asymptotic performance. This is especially true with high-capacity parametric function approximators, such as deep networks. In this paper, we study how to bridge this gap, by employing uncertainty-aware dynamics models. We propose a new algorithm called probabilistic ensembles with trajectory sampling (PETS) that combines uncertainty-aware deep network dynamics models with sampling-based uncertainty propagation. Our comparison to state-of-the-art model-based and model-free deep RL algorithms shows that our approach matches the asymptotic performance of model-free algorithms on several challenging benchmark tasks, while requiring significantly fewer samples (e.g., 8 and 125 times fewer samples than Soft Actor Critic and Proximal Policy Optimization respectively on the half-cheetah task).",
+    "repository": "arXiv",
+    "archiveID": "arXiv:1805.12114",
+    "url": "https://arxiv.org/abs/1805.12114",
+    "DOI": "",
+    "arxiv": "1805.12114",
+    "source": "arxiv",
+    "key": "chua2018pets",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "FPUJJ45V"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Coupling Vision and Proprioception for Navigation of Legged Robots",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Zipeng",
+        "lastName": "Fu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ashish",
+        "lastName": "Kumar"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ananye",
+        "lastName": "Agarwal"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Haozhi",
+        "lastName": "Qi"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jitendra",
+        "lastName": "Malik"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Deepak",
+        "lastName": "Pathak"
+      }
+    ],
+    "date": "2021-12-03",
+    "abstractNote": "We exploit the complementary strengths of vision and proprioception to develop a point-goal navigation system for legged robots, called VP-Nav. Legged systems are capable of traversing more complex terrain than wheeled robots, but to fully utilize this capability, we need a high-level path planner in the navigation system to be aware of the walking capabilities of the low-level locomotion policy in varying environments. We achieve this by using proprioceptive feedback to ensure the safety of the planned path by sensing unexpected obstacles like glass walls, terrain properties like slipperiness or softness of the ground and robot properties like extra payload that are likely missed by vision. The navigation system uses onboard cameras to generate an occupancy map and a corresponding cost map to reach the goal. A fast marching planner then generates a target path. A velocity command generator takes this as input to generate the desired velocity for the walking policy. A safety advisor module adds sensed unexpected obstacles to the occupancy map and environment-determined speed limits to the velocity command generator. We show superior performance compared to wheeled robot baselines, and ablation studies which have disjoint high-level planning and low-level control. We also show the real-world deployment of VP-Nav on a quadruped robot with onboard sensors and computation. Videos at https://navigation-locomotion.github.io",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2112.02094",
+    "url": "https://arxiv.org/abs/2112.02094",
+    "DOI": "",
+    "arxiv": "2112.02094",
+    "source": "arxiv",
+    "key": "fu2022coupling",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "4E58JHUR"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Mastering Diverse Domains through World Models",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Danijar",
+        "lastName": "Hafner"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jurgis",
+        "lastName": "Pasukonis"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jimmy",
+        "lastName": "Ba"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Timothy",
+        "lastName": "Lillicrap"
+      }
+    ],
+    "date": "2023-01-10",
+    "abstractNote": "Developing a general algorithm that learns to solve tasks across a wide range of applications has been a fundamental challenge in artificial intelligence. Although current reinforcement learning algorithms can be readily applied to tasks similar to what they have been developed for, configuring them for new application domains requires significant human expertise and experimentation. We present DreamerV3, a general algorithm that outperforms specialized methods across over 150 diverse tasks, with a single configuration. Dreamer learns a model of the environment and improves its behavior by imagining future scenarios. Robustness techniques based on normalization, balancing, and transformations enable stable learning across domains. Applied out of the box, Dreamer is the first algorithm to collect diamonds in Minecraft from scratch without human data or curricula. This achievement has been posed as a significant challenge in artificial intelligence that requires exploring farsighted strategies from pixels and sparse rewards in an open world. Our work allows solving challenging control problems without extensive experimentation, making reinforcement learning broadly applicable.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2301.04104",
+    "url": "https://arxiv.org/abs/2301.04104",
+    "DOI": "",
+    "arxiv": "2301.04104",
+    "source": "arxiv",
+    "key": "hafner2023dreamerv3",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "NTEFNTKP"
+  },
+  {
+    "itemType": "preprint",
+    "title": "TD-MPC2: Scalable, Robust World Models for Continuous Control",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Nicklas",
+        "lastName": "Hansen"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Hao",
+        "lastName": "Su"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Xiaolong",
+        "lastName": "Wang"
+      }
+    ],
+    "date": "2023-10-25",
+    "abstractNote": "TD-MPC is a model-based reinforcement learning (RL) algorithm that performs local trajectory optimization in the latent space of a learned implicit (decoder-free) world model. In this work, we present TD-MPC2: a series of improvements upon the TD-MPC algorithm. We demonstrate that TD-MPC2 improves significantly over baselines across 104 online RL tasks spanning 4 diverse task domains, achieving consistently strong results with a single set of hyperparameters. We further show that agent capabilities increase with model and data size, and successfully train a single 317M parameter agent to perform 80 tasks across multiple task domains, embodiments, and action spaces. We conclude with an account of lessons, opportunities, and risks associated with large TD-MPC2 agents. Explore videos, models, data, code, and more at https://tdmpc2.com",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2310.16828",
+    "url": "https://arxiv.org/abs/2310.16828",
+    "DOI": "",
+    "arxiv": "2310.16828",
+    "source": "arxiv",
+    "key": "hansen2024tdmpc2",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "E3FZZZF8"
+  },
+  {
+    "itemType": "preprint",
+    "title": "World Model-based Perception for Visual Legged Locomotion",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Hang",
+        "lastName": "Lai"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jiahang",
+        "lastName": "Cao"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jiafeng",
+        "lastName": "Xu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Hongtao",
+        "lastName": "Wu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Yunfeng",
+        "lastName": "Lin"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Tao",
+        "lastName": "Kong"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Yong",
+        "lastName": "Yu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Weinan",
+        "lastName": "Zhang"
+      }
+    ],
+    "date": "2024-09-25",
+    "abstractNote": "Legged locomotion over various terrains is challenging and requires precise perception of the robot and its surroundings from both proprioception and vision. However, learning directly from high-dimensional visual input is often data-inefficient and intricate. To address this issue, traditional methods attempt to learn a teacher policy with access to privileged information first and then learn a student policy to imitate the teacher's behavior with visual input. Despite some progress, this imitation framework prevents the student policy from achieving optimal performance due to the information gap between inputs. Furthermore, the learning process is unnatural since animals intuitively learn to traverse different terrains based on their understanding of the world without privileged knowledge. Inspired by this natural ability, we propose a simple yet effective method, World Model-based Perception (WMP), which builds a world model of the environment and learns a policy based on the world model. We illustrate that though completely trained in simulation, the world model can make accurate predictions of real-world trajectories, thus providing informative signals for the policy controller. Extensive simulated and real-world experiments demonstrate that WMP outperforms state-of-the-art baselines in traversability and robustness. Videos and Code are available at: https://wmp-loco.github.io/.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2409.16784",
+    "url": "https://arxiv.org/abs/2409.16784",
+    "DOI": "",
+    "arxiv": "2409.16784",
+    "source": "arxiv",
+    "key": "lai2024wmp",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "GMJCSMSM"
+  },
+  {
+    "itemType": "preprint",
+    "title": "WAVE-Go: World-Model Navigation with Adaptive Execution for Wheel-Legged Robots",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Mingyi",
+        "lastName": "Li"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ji",
+        "lastName": "Li"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Zhihao",
+        "lastName": "Ouyang"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Yage",
+        "lastName": "He"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Börje F.",
+        "lastName": "Karlsson"
+      }
+    ],
+    "date": "2026-09-16",
+    "abstractNote": "World models can anticipate the consequences of navigation actions, but predicted action sequences may become invalid during execution, especially when wheel-legged robots encounter dynamic obstacles or change locomotion modes. We propose WAVE-Go, an image-goal navigation framework that separates world-action prediction from interruptible command execution. Its executor adaptively selects an action prefix and cancels pending commands when updated observations invalidate execution. A conditional-risk formulation specifies prefix selection under an estimated cumulative failure budget, while posture and locomotion-mode transitions require clearance, stability, and task-evidence checks. In the reported navigation evaluation, WAVE-Go achieves 74.1% in-distribution success and 63.3% dynamic out-of-distribution success, exceeding the strongest baseline by 4.7 and 7.7 percentage points, respectively, while reducing collisions from 4.4 to 2.9 per 100 m. Compared with interruptible fixed four-command execution, WAVE-Go raises success by 4.0 percentage points while reducing replanning frequency by 51.2% and collision rate by 6.5%. Execution ablations also show that runtime interruption improves success, collision rate, and reaction latency at the cost of additional replanning. These results support adaptive, interruptible execution as a means of balancing navigation performance and planning overhead. Code is available at https://github.com/vigorlee/wave-go.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2609.18193",
+    "url": "https://arxiv.org/abs/2609.18193",
+    "DOI": "",
+    "arxiv": "2609.18193",
+    "source": "arxiv",
+    "key": "li2026wavego",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "VA6QAX9N"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Wild Visual Navigation: Fast Traversability Learning via Pre-Trained Models and Online Self-Supervision",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Matías",
+        "lastName": "Mattamala"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jonas",
+        "lastName": "Frey"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Piotr",
+        "lastName": "Libera"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Nived",
+        "lastName": "Chebrolu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Georg",
+        "lastName": "Martius"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Cesar",
+        "lastName": "Cadena"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Marco",
+        "lastName": "Hutter"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Maurice",
+        "lastName": "Fallon"
+      }
+    ],
+    "date": "2024-04-10",
+    "abstractNote": "Natural environments such as forests and grasslands are challenging for robotic navigation because of the false perception of rigid obstacles from high grass, twigs, or bushes. In this work, we present Wild Visual Navigation (WVN), an online self-supervised learning system for visual traversability estimation. The system is able to continuously adapt from a short human demonstration in the field, only using onboard sensing and computing. One of the key ideas to achieve this is the use of high-dimensional features from pre-trained self-supervised models, which implicitly encode semantic information that massively simplifies the learning task. Further, the development of an online scheme for supervision generator enables concurrent training and inference of the learned model in the wild. We demonstrate our approach through diverse real-world deployments in forests, parks, and grasslands. Our system is able to bootstrap the traversable terrain segmentation in less than 5 min of in-field training time, enabling the robot to navigate in complex, previously unseen outdoor terrains. Code: https://bit.ly/498b0CV - Project page:https://bit.ly/3M6nMHH",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2404.07110",
+    "url": "https://arxiv.org/abs/2404.07110",
+    "DOI": "",
+    "arxiv": "2404.07110",
+    "source": "arxiv",
+    "key": "mattamala2024wvn",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "RPDN7376"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Isaac Lab: A GPU-Accelerated Simulation Framework for Multi-Modal Robot Learning",
+    "creators": [
+      {
+        "creatorType": "author",
+        "name": "NVIDIA"
+      },
+      {
+        "creatorType": "author",
+        "name": ":"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Mayank",
+        "lastName": "Mittal"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Pascal",
+        "lastName": "Roth"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "James",
+        "lastName": "Tigue"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Antoine",
+        "lastName": "Richard"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Octi",
+        "lastName": "Zhang"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Peter",
+        "lastName": "Du"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Antonio",
+        "lastName": "Serrano-Muñoz"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Xinjie",
+        "lastName": "Yao"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "René",
+        "lastName": "Zurbrügg"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Nikita",
+        "lastName": "Rudin"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Lukasz",
+        "lastName": "Wawrzyniak"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Milad",
+        "lastName": "Rakhsha"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Alain",
+        "lastName": "Denzler"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Eric",
+        "lastName": "Heiden"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ales",
+        "lastName": "Borovicka"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ossama",
+        "lastName": "Ahmed"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Iretiayo",
+        "lastName": "Akinola"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Abrar",
+        "lastName": "Anwar"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Mark T.",
+        "lastName": "Carlson"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ji Yuan",
+        "lastName": "Feng"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Animesh",
+        "lastName": "Garg"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Renato",
+        "lastName": "Gasoto"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Lionel",
+        "lastName": "Gulich"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Yijie",
+        "lastName": "Guo"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "M.",
+        "lastName": "Gussert"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Alex",
+        "lastName": "Hansen"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Mihir",
+        "lastName": "Kulkarni"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Chenran",
+        "lastName": "Li"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Wei",
+        "lastName": "Liu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Viktor",
+        "lastName": "Makoviychuk"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Grzegorz",
+        "lastName": "Malczyk"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Hammad",
+        "lastName": "Mazhar"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Masoud",
+        "lastName": "Moghani"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Adithyavairavan",
+        "lastName": "Murali"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Michael",
+        "lastName": "Noseworthy"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Alexander",
+        "lastName": "Poddubny"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Nathan",
+        "lastName": "Ratliff"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Welf",
+        "lastName": "Rehberg"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Clemens",
+        "lastName": "Schwarke"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ritvik",
+        "lastName": "Singh"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "James Latham",
+        "lastName": "Smith"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Bingjie",
+        "lastName": "Tang"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ruchik",
+        "lastName": "Thaker"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Matthew",
+        "lastName": "Trepte"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Karl Van",
+        "lastName": "Wyk"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Fangzhou",
+        "lastName": "Yu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Alex",
+        "lastName": "Millane"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Vikram",
+        "lastName": "Ramasamy"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Remo",
+        "lastName": "Steiner"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Sangeeta",
+        "lastName": "Subramanian"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Clemens",
+        "lastName": "Volk"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "CY",
+        "lastName": "Chen"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Neel",
+        "lastName": "Jawale"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ashwin Varghese",
+        "lastName": "Kuruttukulam"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Michael A.",
+        "lastName": "Lin"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ajay",
+        "lastName": "Mandlekar"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Karsten",
+        "lastName": "Patzwaldt"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "John",
+        "lastName": "Welsh"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Huihua",
+        "lastName": "Zhao"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Fatima",
+        "lastName": "Anes"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jean-Francois",
+        "lastName": "Lafleche"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Nicolas",
+        "lastName": "Moënne-Loccoz"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Soowan",
+        "lastName": "Park"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Rob",
+        "lastName": "Stepinski"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Dirk Van",
+        "lastName": "Gelder"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Chris",
+        "lastName": "Amevor"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jan",
+        "lastName": "Carius"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jumyung",
+        "lastName": "Chang"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Anka He",
+        "lastName": "Chen"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Pablo de Heras",
+        "lastName": "Ciechomski"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Gilles",
+        "lastName": "Daviet"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Mohammad",
+        "lastName": "Mohajerani"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Julia von",
+        "lastName": "Muralt"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Viktor",
+        "lastName": "Reutskyy"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Michael",
+        "lastName": "Sauter"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Simon",
+        "lastName": "Schirm"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Eric L.",
+        "lastName": "Shi"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Pierre",
+        "lastName": "Terdiman"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Kenny",
+        "lastName": "Vilella"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Tobias",
+        "lastName": "Widmer"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Gordon",
+        "lastName": "Yeoman"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Tiffany",
+        "lastName": "Chen"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Sergey",
+        "lastName": "Grizan"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Cathy",
+        "lastName": "Li"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Lotus",
+        "lastName": "Li"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Connor",
+        "lastName": "Smith"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Rafael",
+        "lastName": "Wiltz"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Kostas",
+        "lastName": "Alexis"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Yan",
+        "lastName": "Chang"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "David",
+        "lastName": "Chu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Linxi \"Jim\"",
+        "lastName": "Fan"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Farbod",
+        "lastName": "Farshidian"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ankur",
+        "lastName": "Handa"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Spencer",
+        "lastName": "Huang"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Marco",
+        "lastName": "Hutter"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Yashraj",
+        "lastName": "Narang"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Soha",
+        "lastName": "Pouya"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Shiwei",
+        "lastName": "Sheng"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Yuke",
+        "lastName": "Zhu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Miles",
+        "lastName": "Macklin"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Adam",
+        "lastName": "Moravanszky"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Philipp",
+        "lastName": "Reist"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Yunrong",
+        "lastName": "Guo"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "David",
+        "lastName": "Hoeller"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Gavriel",
+        "lastName": "State"
+      }
+    ],
+    "date": "2025-11-06",
+    "abstractNote": "We present Isaac Lab, the natural successor to Isaac Gym, which extends the paradigm of GPU-native robotics simulation into the era of large-scale multi-modal learning. Isaac Lab combines high-fidelity GPU parallel physics, photorealistic rendering, and a modular, composable architecture for designing environments and training robot policies. Beyond physics and rendering, the framework integrates actuator models, multi-frequency sensor simulation, data collection pipelines, and domain randomization tools, unifying best practices for reinforcement and imitation learning at scale within a single extensible platform. We highlight its application to a diverse set of challenges, including whole-body control, cross-embodiment mobility, contact-rich and dexterous manipulation, and the integration of human demonstrations for skill acquisition. Finally, we discuss upcoming integration with the differentiable, GPU-accelerated Newton physics engine, which promises new opportunities for scalable, data-efficient, and gradient-based approaches to robot learning. We believe Isaac Lab's combination of advanced simulation capabilities, rich sensing, and data-center scale execution will help unlock the next generation of breakthroughs in robotics research.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2511.04831",
+    "url": "https://arxiv.org/abs/2511.04831",
+    "DOI": "",
+    "arxiv": "2511.04831",
+    "source": "arxiv",
+    "key": "nvidia2025isaaclab",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "8VC7HFQ2"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Learning to Walk in Minutes Using Massively Parallel Deep Reinforcement Learning",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Nikita",
+        "lastName": "Rudin"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "David",
+        "lastName": "Hoeller"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Philipp",
+        "lastName": "Reist"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Marco",
+        "lastName": "Hutter"
+      }
+    ],
+    "date": "2021-09-24",
+    "abstractNote": "In this work, we present and study a training set-up that achieves fast policy generation for real-world robotic tasks by using massive parallelism on a single workstation GPU. We analyze and discuss the impact of different training algorithm components in the massively parallel regime on the final policy performance and training times. In addition, we present a novel game-inspired curriculum that is well suited for training with thousands of simulated robots in parallel. We evaluate the approach by training the quadrupedal robot ANYmal to walk on challenging terrain. The parallel approach allows training policies for flat terrain in under four minutes, and in twenty minutes for uneven terrain. This represents a speedup of multiple orders of magnitude compared to previous work. Finally, we transfer the policies to the real robot to validate the approach. We open-source our training code to help accelerate further research in the field of learned legged locomotion.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2109.11978",
+    "url": "https://arxiv.org/abs/2109.11978",
+    "DOI": "",
+    "arxiv": "2109.11978",
+    "source": "arxiv",
+    "key": "rudin2021walk",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "7C9M2PH6"
+  },
+  {
+    "itemType": "preprint",
+    "title": "ViNT: A Foundation Model for Visual Navigation",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Dhruv",
+        "lastName": "Shah"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ajay",
+        "lastName": "Sridhar"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Nitish",
+        "lastName": "Dashora"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Kyle",
+        "lastName": "Stachowicz"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Kevin",
+        "lastName": "Black"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Noriaki",
+        "lastName": "Hirose"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Sergey",
+        "lastName": "Levine"
+      }
+    ],
+    "date": "2023-06-26",
+    "abstractNote": "General-purpose pre-trained models (\"foundation models\") have enabled practitioners to produce generalizable solutions for individual machine learning problems with datasets that are significantly smaller than those required for learning from scratch. Such models are typically trained on large and diverse datasets with weak supervision, consuming much more training data than is available for any individual downstream application. In this paper, we describe the Visual Navigation Transformer (ViNT), a foundation model that aims to bring the success of general-purpose pre-trained models to vision-based robotic navigation. ViNT is trained with a general goal-reaching objective that can be used with any navigation dataset, and employs a flexible Transformer-based architecture to learn navigational affordances and enable efficient adaptation to a variety of downstream navigational tasks. ViNT is trained on a number of existing navigation datasets, comprising hundreds of hours of robotic navigation from a variety of different robotic platforms, and exhibits positive transfer, outperforming specialist models trained on singular datasets. ViNT can be augmented with diffusion-based subgoal proposals to explore novel environments, and can solve kilometer-scale navigation problems when equipped with long-range heuristics. ViNT can also be adapted to novel task specifications with a technique inspired by prompt-tuning, where the goal encoder is replaced by an encoding of another task modality (e.g., GPS waypoints or routing commands) embedded into the same space of goal tokens. This flexibility and ability to accommodate a variety of downstream problem domains establishes ViNT as an effective foundation model for mobile robotics. For videos, code, and model checkpoints, see our project page at https://visualnav-transformer.github.io.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2306.14846",
+    "url": "https://arxiv.org/abs/2306.14846",
+    "DOI": "",
+    "arxiv": "2306.14846",
+    "source": "arxiv",
+    "key": "shah2023vint",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "5QUFP522"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Learning from Reward-Free Offline Data: A Case for Planning with Latent Dynamics Models",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Vlad",
+        "lastName": "Sobal"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Wancong",
+        "lastName": "Zhang"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Kyunghyun",
+        "lastName": "Cho"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Randall",
+        "lastName": "Balestriero"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Tim G. J.",
+        "lastName": "Rudner"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Yann",
+        "lastName": "LeCun"
+      }
+    ],
+    "date": "2025-02-20",
+    "abstractNote": "A long-standing goal in AI is to develop agents capable of solving diverse tasks across a range of environments, including those never seen during training. Two dominant paradigms address this challenge: (i) reinforcement learning (RL), which learns policies via trial and error, and (ii) optimal control, which plans actions using a known or learned dynamics model. However, their comparative strengths in the offline setting - where agents must learn from reward-free trajectories - remain underexplored. In this work, we systematically evaluate RL and control-based methods on a suite of navigation tasks, using offline datasets of varying quality. On the RL side, we consider goal-conditioned and zero-shot methods. On the control side, we train a latent dynamics model using the Joint Embedding Predictive Architecture (JEPA) and employ it for planning. We investigate how factors such as data diversity, trajectory quality, and environment variability influence the performance of these approaches. Our results show that model-free RL benefits most from large amounts of high-quality data, whereas model-based planning generalizes better to unseen layouts and is more data-efficient, while achieving trajectory stitching performance comparable to leading model-free methods. Notably, planning with a latent dynamics model proves to be a strong approach for handling suboptimal offline data and adapting to diverse environments.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2502.14819",
+    "url": "https://arxiv.org/abs/2502.14819",
+    "DOI": "",
+    "arxiv": "2502.14819",
+    "source": "arxiv",
+    "key": "sobal2025pldm",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "8P2IM92G"
+  },
+  {
+    "itemType": "preprint",
+    "title": "NoMaD: Goal Masked Diffusion Policies for Navigation and Exploration",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Ajay",
+        "lastName": "Sridhar"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Dhruv",
+        "lastName": "Shah"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Catherine",
+        "lastName": "Glossop"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Sergey",
+        "lastName": "Levine"
+      }
+    ],
+    "date": "2023-10-11",
+    "abstractNote": "Robotic learning for navigation in unfamiliar environments needs to provide policies for both task-oriented navigation (i.e., reaching a goal that the robot has located), and task-agnostic exploration (i.e., searching for a goal in a novel setting). Typically, these roles are handled by separate models, for example by using subgoal proposals, planning, or separate navigation strategies. In this paper, we describe how we can train a single unified diffusion policy to handle both goal-directed navigation and goal-agnostic exploration, with the latter providing the ability to search novel environments, and the former providing the ability to reach a user-specified goal once it has been located. We show that this unified policy results in better overall performance when navigating to visually indicated goals in novel environments, as compared to approaches that use subgoal proposals from generative models, or prior methods based on latent variable models. We instantiate our method by using a large-scale Transformer-based policy trained on data from multiple ground robots, with a diffusion model decoder to flexibly handle both goal-conditioned and goal-agnostic navigation. Our experiments, conducted on a real-world mobile robot platform, show effective navigation in unseen environments in comparison with five alternative methods, and demonstrate significant improvements in performance and lower collision rates, despite utilizing smaller models than state-of-the-art approaches. For more videos, code, and pre-trained model checkpoints, see https://general-navigation-models.github.io/nomad/",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2310.07896",
+    "url": "https://arxiv.org/abs/2310.07896",
+    "DOI": "",
+    "arxiv": "2310.07896",
+    "source": "arxiv",
+    "key": "sridhar2024nomad",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "4VT2JJ4P"
+  },
+  {
+    "itemType": "preprint",
+    "title": "GrandTour: A Legged Robotics Dataset in the Wild for Multi-Modal Perception and State Estimation",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Turcan",
+        "lastName": "Tuna"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jonas",
+        "lastName": "Frey"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Frank",
+        "lastName": "Fu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Katharine",
+        "lastName": "Patterson"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Tianao",
+        "lastName": "Xu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Maurice",
+        "lastName": "Fallon"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Cesar",
+        "lastName": "Cadena"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Marco",
+        "lastName": "Hutter"
+      }
+    ],
+    "date": "2026-02-20",
+    "abstractNote": "Accurate state estimation and multi-modal perception are prerequisites for autonomous legged robots in complex, large-scale environments. To date, no large-scale public legged-robot dataset captures the real-world conditions needed to develop and benchmark algorithms for legged-robot state estimation, perception, and navigation. To address this, we introduce the GrandTour dataset, a multi-modal legged-robotics dataset collected across challenging outdoor and indoor environments, featuring an ANYbotics ANYmal-D quadruped equipped with the Boxi multi-modal sensor payload. GrandTour spans a broad range of environments and operational scenarios across distinct test sites, ranging from alpine scenery and forests to demolished buildings and urban areas, and covers a wide variation in scale, complexity, illumination, and weather conditions. The dataset provides time-synchronized sensor data from spinning LiDARs, multiple RGB cameras with complementary characteristics, proprioceptive sensors, and stereo depth cameras. Moreover, it includes high-precision ground-truth trajectories from satellite-based RTK-GNSS and a Leica Geosystems total station. This dataset supports research in SLAM, high-precision state estimation, and multi-modal learning, enabling rigorous evaluation and development of new approaches to sensor fusion in legged robotic systems. With its extensive scope, GrandTour represents the largest open-access legged-robotics dataset to date. The dataset is available at https://grand-tour.leggedrobotics.com on HuggingFace (ROS-independent), and in ROS formats, along with tools and demo resources.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2602.18164",
+    "url": "https://arxiv.org/abs/2602.18164",
+    "DOI": "",
+    "arxiv": "2602.18164",
+    "source": "arxiv",
+    "key": "tuna2026grandtour",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "QFBZH7WX"
+  },
+  {
+    "itemType": "preprint",
+    "title": "DayDreamer: World Models for Physical Robot Learning",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Philipp",
+        "lastName": "Wu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Alejandro",
+        "lastName": "Escontrela"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Danijar",
+        "lastName": "Hafner"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ken",
+        "lastName": "Goldberg"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Pieter",
+        "lastName": "Abbeel"
+      }
+    ],
+    "date": "2022-06-28",
+    "abstractNote": "To solve tasks in complex environments, robots need to learn from experience. Deep reinforcement learning is a common approach to robot learning but requires a large amount of trial and error to learn, limiting its deployment in the physical world. As a consequence, many advances in robot learning rely on simulators. On the other hand, learning inside of simulators fails to capture the complexity of the real world, is prone to simulator inaccuracies, and the resulting behaviors do not adapt to changes in the world. The Dreamer algorithm has recently shown great promise for learning from small amounts of interaction by planning within a learned world model, outperforming pure reinforcement learning in video games. Learning a world model to predict the outcomes of potential actions enables planning in imagination, reducing the amount of trial and error needed in the real environment. However, it is unknown whether Dreamer can facilitate faster learning on physical robots. In this paper, we apply Dreamer to 4 robots to learn online and directly in the real world, without simulators. Dreamer trains a quadruped robot to roll off its back, stand up, and walk from scratch and without resets in only 1 hour. We then push the robot and find that Dreamer adapts within 10 minutes to withstand perturbations or quickly roll over and stand back up. On two different robotic arms, Dreamer learns to pick and place multiple objects directly from camera images and sparse rewards, approaching human performance. On a wheeled robot, Dreamer learns to navigate to a goal position purely from camera images, automatically resolving ambiguity about the robot orientation. Using the same hyperparameters across all experiments, we find that Dreamer is capable of online learning in the real world, establishing a strong baseline. We release our infrastructure for future applications of world models to robot learning.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2206.14176",
+    "url": "https://arxiv.org/abs/2206.14176",
+    "DOI": "",
+    "arxiv": "2206.14176",
+    "source": "arxiv",
+    "key": "wu2022daydreamer",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "QETT7BJP"
+  },
+  {
+    "itemType": "preprint",
+    "title": "RoboJEPA: Scaling Robotic Latent World Models",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Artem",
+        "lastName": "Zholus"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Nicolas",
+        "lastName": "Beltran-Velez"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jianhao",
+        "lastName": "Yuan"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Sarath",
+        "lastName": "Chandar"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Tushar",
+        "lastName": "Nagarajan"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Daniel",
+        "lastName": "Severo"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Koustuv",
+        "lastName": "Sinha"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Michal",
+        "lastName": "Drozdzal"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Adriana Romero",
+        "lastName": "Soriano"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jeannette",
+        "lastName": "Bohg"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Nicolas",
+        "lastName": "Ballas"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Mahmoud",
+        "lastName": "Assran"
+      }
+    ],
+    "date": "2026-10-07",
+    "abstractNote": "Latent world models have shown a remarkable ability to predict future states and to plan in the real world. In practice, however, we lack a principled way to estimate how their capabilities scale with model size, data, and compute, an open problem that slows progress in the field. In this work we present RoboJEPA, a world model based on the Joint Embedding Predictive Architecture (JEPA) and trained on a large-scale dataset spanning 12 robotic embodiments. We show that RoboJEPA's imagination error, the error of its latent rollouts, follows a second-order power law in compute, allowing us to predict model quality well beyond the scale at which the law is fit. We further show that downstream robotic planning performance improves predictably with compute, and that imagination error is strongly correlated with it, making it a reliable proxy for real-robot evaluation. Finally, we demonstrate that latent world models can be deployed zero-shot as robotic agents, planning toward a single goal image to solve tasks requiring long-horizon planning on real hardware. We release all model checkpoints together with our training and robot deployment code. To our knowledge, this is the first work to establish scaling laws for multi-embodiment robotic world models trained on real robot data, and RoboJEPA, at 8B parameters, is the largest JEPA predictor model trained to date.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2610.10515",
+    "url": "https://arxiv.org/abs/2610.10515",
+    "DOI": "",
+    "arxiv": "2610.10515",
+    "source": "arxiv",
+    "key": "zholus2026robojepa",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "JKCSJCFX"
+  },
+  {
+    "itemType": "preprint",
+    "title": "DINO-WM: World Models on Pre-trained Visual Features enable Zero-shot Planning",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Gaoyue",
+        "lastName": "Zhou"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Hengkai",
+        "lastName": "Pan"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Yann",
+        "lastName": "LeCun"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Lerrel",
+        "lastName": "Pinto"
+      }
+    ],
+    "date": "2024-11-07",
+    "abstractNote": "The ability to predict future outcomes given control actions is fundamental for physical reasoning. However, such predictive models, often called world models, remains challenging to learn and are typically developed for task-specific solutions with online policy learning. To unlock world models' true potential, we argue that they should 1) be trainable on offline, pre-collected trajectories, 2) support test-time behavior optimization, and 3) facilitate task-agnostic reasoning. To this end, we present DINO World Model (DINO-WM), a new method to model visual dynamics without reconstructing the visual world. DINO-WM leverages spatial patch features pre-trained with DINOv2, enabling it to learn from offline behavioral trajectories by predicting future patch features. This allows DINO-WM to achieve observational goals through action sequence optimization, facilitating task-agnostic planning by treating goal features as prediction targets. We demonstrate that DINO-WM achieves zero-shot behavioral solutions at test time on six environments without expert demonstrations, reward modeling, or pre-learned inverse models, outperforming prior state-of-the-art work across diverse task families such as arbitrarily configured mazes, push manipulation with varied object shapes, and multi-particle scenarios.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2411.04983",
+    "url": "https://arxiv.org/abs/2411.04983",
+    "DOI": "",
+    "arxiv": "2411.04983",
+    "source": "arxiv",
+    "key": "zhou2024dinowm",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "FFFR2RD5"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Predictive Training with Latent Imagination for Visual Quadruped Navigation",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Yancheng",
+        "lastName": "Zhu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Wanli",
+        "lastName": "Ma"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Chen",
+        "lastName": "Han"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Irvin Haozhe",
+        "lastName": "Zhan"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Bingfeng",
+        "lastName": "Qin"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Yixin",
+        "lastName": "Xu"
+      }
+    ],
+    "date": "2026-07-20",
+    "abstractNote": "Reinforcement-learning navigation policies for legged robots select actions reactively from current observations and short-term memory, with limited capacity to anticipate how moving obstacles will evolve in the near future. In dynamic environments, this reactivity causes the robot to respond too late because collision risk depends on short-horizon scene structure rather than on current obstacle positions alone. Lightweight predictive supervision applied to the policy's recurrent state during training can encode anticipatory obstacle dynamics without modifying the inference-time controller. We augment a reactive LSTM-SRU navigation backbone with an auxiliary JEPA-style predictor and SIGReg regularization: during training, the predictor supervises the deterministic hidden state to anticipate its own next state; at inference, it is fully discarded, incurring zero additional computational cost. On simulated and real-world navigation benchmarks with dynamic obstacles, our method substantially improves navigation success while reducing collision rates through the predictive training signal alone, without additional inference-time parameters. Real-robot deployment on a Unitree Go2 demonstrates zero-shot sim-to-real transfer: the controller navigates cluttered indoor and dynamic outdoor environments without fine-tuning, with evasive behavior consistent with the collision reduction observed in simulation.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2607.17574",
+    "url": "https://arxiv.org/abs/2607.17574",
+    "DOI": "",
+    "arxiv": "2607.17574",
+    "source": "arxiv",
+    "key": "zhu2026predictive",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "3QXCIBXU"
+  },
+  {
+    "itemType": "journalArticle",
+    "title": "DreamerNav: learning-based autonomous navigation in dynamic indoor environments using world models",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Stuart",
+        "lastName": "Shanks"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jonathan",
+        "lastName": "Embley-Riches"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jianheng",
+        "lastName": "Liu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Andromachi Maria",
+        "lastName": "Delfaki"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Carlo",
+        "lastName": "Ciliberto"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Dimitrios",
+        "lastName": "Kanoulas"
+      }
+    ],
+    "date": "2025-9-26",
+    "DOI": "10.3389/frobt.2025.1655171",
+    "url": "https://doi.org/10.3389/frobt.2025.1655171",
+    "source": "crossref",
+    "publicationTitle": "Frontiers in Robotics and AI",
+    "volume": "12",
+    "issue": "",
+    "pages": "",
+    "key": "shanks2025dreamernav",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "GPABWWTJ"
+  },
+  {
+    "itemType": "journalArticle",
+    "title": "Control Barrier Function Based Quadratic Programs for Safety Critical Systems",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Aaron D.",
+        "lastName": "Ames"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Xiangru",
+        "lastName": "Xu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jessy W.",
+        "lastName": "Grizzle"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Paulo",
+        "lastName": "Tabuada"
+      }
+    ],
+    "date": "2017-8",
+    "DOI": "10.1109/tac.2016.2638961",
+    "url": "https://doi.org/10.1109/tac.2016.2638961",
+    "source": "crossref",
+    "publicationTitle": "IEEE Transactions on Automatic Control",
+    "volume": "62",
+    "issue": "8",
+    "pages": "3861-3876",
+    "key": "ames2017cbf",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "VUE7FENT"
+  },
+  {
+    "itemType": "journalArticle",
+    "title": "A Formal Basis for the Heuristic Determination of Minimum Cost Paths",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Peter",
+        "lastName": "Hart"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Nils",
+        "lastName": "Nilsson"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Bertram",
+        "lastName": "Raphael"
+      }
+    ],
+    "date": "1968",
+    "DOI": "10.1109/tssc.1968.300136",
+    "url": "https://doi.org/10.1109/tssc.1968.300136",
+    "source": "crossref",
+    "publicationTitle": "IEEE Transactions on Systems Science and Cybernetics",
+    "volume": "4",
+    "issue": "2",
+    "pages": "100-107",
+    "key": "hart1968astar",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "9XQ76XBH"
+  },
+  {
+    "itemType": "journalArticle",
+    "title": "The Cross-Entropy Method for Combinatorial and Continuous Optimization",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Reuven",
+        "lastName": "Rubinstein"
+      }
+    ],
+    "date": "1999-9",
+    "DOI": "10.1023/a:1010091220143",
+    "url": "https://doi.org/10.1023/a:1010091220143",
+    "source": "crossref",
+    "publicationTitle": "Methodology And Computing In Applied Probability",
+    "volume": "1",
+    "issue": "2",
+    "pages": "127-190",
+    "key": "rubinstein1999cem",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "58NN2KTU"
+  },
+  {
+    "itemType": "preprint",
+    "title": "3D Scene Graph: A Structure for Unified Semantics, 3D Space, and Camera",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Iro",
+        "lastName": "Armeni"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Zhi-Yang",
+        "lastName": "He"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "JunYoung",
+        "lastName": "Gwak"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Amir R.",
+        "lastName": "Zamir"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Martin",
+        "lastName": "Fischer"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jitendra",
+        "lastName": "Malik"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Silvio",
+        "lastName": "Savarese"
+      }
+    ],
+    "date": "2019-10-06",
+    "abstractNote": "A comprehensive semantic understanding of a scene is important for many applications - but in what space should diverse semantic information (e.g., objects, scene categories, material types, texture, etc.) be grounded and what should be its structure? Aspiring to have one unified structure that hosts diverse types of semantics, we follow the Scene Graph paradigm in 3D, generating a 3D Scene Graph. Given a 3D mesh and registered panoramic images, we construct a graph that spans the entire building and includes semantics on objects (e.g., class, material, and other attributes), rooms (e.g., scene category, volume, etc.) and cameras (e.g., location, etc.), as well as the relationships among these entities. However, this process is prohibitively labor heavy if done manually. To alleviate this we devise a semi-automatic framework that employs existing detection methods and enhances them using two main constraints: I. framing of query images sampled on panoramas to maximize the performance of 2D detectors, and II. multi-view consistency enforcement across 2D detections that originate in different camera locations.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:1910.02527",
+    "url": "https://arxiv.org/abs/1910.02527",
+    "DOI": "",
+    "arxiv": "1910.02527",
+    "source": "arxiv",
+    "key": "armeni2019scenegraph",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "82A3UT28"
+  },
+  {
+    "itemType": "preprint",
+    "title": "ConceptGraphs: Open-Vocabulary 3D Scene Graphs for Perception and Planning",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Qiao",
+        "lastName": "Gu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Alihusein",
+        "lastName": "Kuwajerwala"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Sacha",
+        "lastName": "Morin"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Krishna Murthy",
+        "lastName": "Jatavallabhula"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Bipasha",
+        "lastName": "Sen"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Aditya",
+        "lastName": "Agarwal"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Corban",
+        "lastName": "Rivera"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "William",
+        "lastName": "Paul"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Kirsty",
+        "lastName": "Ellis"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Rama",
+        "lastName": "Chellappa"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Chuang",
+        "lastName": "Gan"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Celso Miguel de",
+        "lastName": "Melo"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Joshua B.",
+        "lastName": "Tenenbaum"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Antonio",
+        "lastName": "Torralba"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Florian",
+        "lastName": "Shkurti"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Liam",
+        "lastName": "Paull"
+      }
+    ],
+    "date": "2023-09-28",
+    "abstractNote": "For robots to perform a wide variety of tasks, they require a 3D representation of the world that is semantically rich, yet compact and efficient for task-driven perception and planning. Recent approaches have attempted to leverage features from large vision-language models to encode semantics in 3D representations. However, these approaches tend to produce maps with per-point feature vectors, which do not scale well in larger environments, nor do they contain semantic spatial relationships between entities in the environment, which are useful for downstream planning. In this work, we propose ConceptGraphs, an open-vocabulary graph-structured representation for 3D scenes. ConceptGraphs is built by leveraging 2D foundation models and fusing their output to 3D by multi-view association. The resulting representations generalize to novel semantic classes, without the need to collect large 3D datasets or finetune models. We demonstrate the utility of this representation through a number of downstream planning tasks that are specified through abstract (language) prompts and require complex reasoning over spatial and semantic concepts. (Project page: https://concept-graphs.github.io/ Explainer video: https://youtu.be/mRhNkQwRYnc )",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2309.16650",
+    "url": "https://arxiv.org/abs/2309.16650",
+    "DOI": "",
+    "arxiv": "2309.16650",
+    "source": "arxiv",
+    "key": "gu2024conceptgraphs",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "JFM39SCZ"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Visual Language Maps for Robot Navigation",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Chenguang",
+        "lastName": "Huang"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Oier",
+        "lastName": "Mees"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Andy",
+        "lastName": "Zeng"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Wolfram",
+        "lastName": "Burgard"
+      }
+    ],
+    "date": "2022-10-11",
+    "abstractNote": "Grounding language to the visual observations of a navigating agent can be performed using off-the-shelf visual-language models pretrained on Internet-scale data (e.g., image captions). While this is useful for matching images to natural language descriptions of object goals, it remains disjoint from the process of mapping the environment, so that it lacks the spatial precision of classic geometric maps. To address this problem, we propose VLMaps, a spatial map representation that directly fuses pretrained visual-language features with a 3D reconstruction of the physical world. VLMaps can be autonomously built from video feed on robots using standard exploration approaches and enables natural language indexing of the map without additional labeled data. Specifically, when combined with large language models (LLMs), VLMaps can be used to (i) translate natural language commands into a sequence of open-vocabulary navigation goals (which, beyond prior work, can be spatial by construction, e.g., \"in between the sofa and TV\" or \"three meters to the right of the chair\") directly localized in the map, and (ii) can be shared among multiple robots with different embodiments to generate new obstacle maps on-the-fly (by using a list of obstacle categories). Extensive experiments carried out in simulated and real world environments show that VLMaps enable navigation according to more complex language instructions than existing methods. Videos are available at https://vlmaps.github.io.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2210.05714",
+    "url": "https://arxiv.org/abs/2210.05714",
+    "DOI": "",
+    "arxiv": "2210.05714",
+    "source": "arxiv",
+    "key": "huang2023vlmaps",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "HGDP564A"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Hydra: A Real-time Spatial Perception System for 3D Scene Graph Construction and Optimization",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Nathan",
+        "lastName": "Hughes"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Yun",
+        "lastName": "Chang"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Luca",
+        "lastName": "Carlone"
+      }
+    ],
+    "date": "2022-01-31",
+    "abstractNote": "3D scene graphs have recently emerged as a powerful high-level representation of 3D environments. A 3D scene graph describes the environment as a layered graph where nodes represent spatial concepts at multiple levels of abstraction and edges represent relations between concepts. While 3D scene graphs can serve as an advanced \"mental model\" for robots, how to build such a rich representation in real-time is still uncharted territory. This paper describes a real-time Spatial Perception System, a suite of algorithms to build a 3D scene graph from sensor data in real-time. Our first contribution is to develop real-time algorithms to incrementally construct the layers of a scene graph as the robot explores the environment; these algorithms build a local Euclidean Signed Distance Function (ESDF) around the current robot location, extract a topological map of places from the ESDF, and then segment the places into rooms using an approach inspired by community-detection techniques. Our second contribution is to investigate loop closure detection and optimization in 3D scene graphs. We show that 3D scene graphs allow defining hierarchical descriptors for loop closure detection; our descriptors capture statistics across layers in the scene graph, ranging from low-level visual appearance to summary statistics about objects and places. We then propose the first algorithm to optimize a 3D scene graph in response to loop closures; our approach relies on embedded deformation graphs to simultaneously correct all layers of the scene graph. We implement the proposed Spatial Perception System into a architecture named Hydra, that combines fast early and mid-level perception processes with slower high-level perception. We evaluate Hydra on simulated and real data and show it is able to reconstruct 3D scene graphs with an accuracy comparable with batch offline methods despite running online.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2201.13360",
+    "url": "https://arxiv.org/abs/2201.13360",
+    "DOI": "",
+    "arxiv": "2201.13360",
+    "source": "arxiv",
+    "key": "hughes2022hydra",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "GUMASI9A"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Code as Policies: Language Model Programs for Embodied Control",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Jacky",
+        "lastName": "Liang"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Wenlong",
+        "lastName": "Huang"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Fei",
+        "lastName": "Xia"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Peng",
+        "lastName": "Xu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Karol",
+        "lastName": "Hausman"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Brian",
+        "lastName": "Ichter"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Pete",
+        "lastName": "Florence"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Andy",
+        "lastName": "Zeng"
+      }
+    ],
+    "date": "2022-09-16",
+    "abstractNote": "Large language models (LLMs) trained on code completion have been shown to be capable of synthesizing simple Python programs from docstrings [1]. We find that these code-writing LLMs can be re-purposed to write robot policy code, given natural language commands. Specifically, policy code can express functions or feedback loops that process perception outputs (e.g.,from object detectors [2], [3]) and parameterize control primitive APIs. When provided as input several example language commands (formatted as comments) followed by corresponding policy code (via few-shot prompting), LLMs can take in new commands and autonomously re-compose API calls to generate new policy code respectively. By chaining classic logic structures and referencing third-party libraries (e.g., NumPy, Shapely) to perform arithmetic, LLMs used in this way can write robot policies that (i) exhibit spatial-geometric reasoning, (ii) generalize to new instructions, and (iii) prescribe precise values (e.g., velocities) to ambiguous descriptions (\"faster\") depending on context (i.e., behavioral commonsense). This paper presents code as policies: a robot-centric formulation of language model generated programs (LMPs) that can represent reactive policies (e.g., impedance controllers), as well as waypoint-based policies (vision-based pick and place, trajectory-based control), demonstrated across multiple real robot platforms. Central to our approach is prompting hierarchical code-gen (recursively defining undefined functions), which can write more complex code and also improves state-of-the-art to solve 39.8% of problems on the HumanEval [1] benchmark. Code and videos are available at https://code-as-policies.github.io",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2209.07753",
+    "url": "https://arxiv.org/abs/2209.07753",
+    "DOI": "",
+    "arxiv": "2209.07753",
+    "source": "arxiv",
+    "key": "liang2023cap",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "N9JS2EKQ"
+  },
+  {
+    "itemType": "preprint",
+    "title": "SayPlan: Grounding Large Language Models using 3D Scene Graphs for Scalable Robot Task Planning",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Krishan",
+        "lastName": "Rana"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jesse",
+        "lastName": "Haviland"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Sourav",
+        "lastName": "Garg"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jad",
+        "lastName": "Abou-Chakra"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ian",
+        "lastName": "Reid"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Niko",
+        "lastName": "Suenderhauf"
+      }
+    ],
+    "date": "2023-07-12",
+    "abstractNote": "Large language models (LLMs) have demonstrated impressive results in developing generalist planning agents for diverse tasks. However, grounding these plans in expansive, multi-floor, and multi-room environments presents a significant challenge for robotics. We introduce SayPlan, a scalable approach to LLM-based, large-scale task planning for robotics using 3D scene graph (3DSG) representations. To ensure the scalability of our approach, we: (1) exploit the hierarchical nature of 3DSGs to allow LLMs to conduct a 'semantic search' for task-relevant subgraphs from a smaller, collapsed representation of the full graph; (2) reduce the planning horizon for the LLM by integrating a classical path planner and (3) introduce an 'iterative replanning' pipeline that refines the initial plan using feedback from a scene graph simulator, correcting infeasible actions and avoiding planning failures. We evaluate our approach on two large-scale environments spanning up to 3 floors and 36 rooms with 140 assets and objects and show that our approach is capable of grounding large-scale, long-horizon task plans from abstract, and natural language instruction for a mobile manipulator robot to execute. We provide real robot video demonstrations on our project page https://sayplan.github.io.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2307.06135",
+    "url": "https://arxiv.org/abs/2307.06135",
+    "DOI": "",
+    "arxiv": "2307.06135",
+    "source": "arxiv",
+    "key": "rana2023sayplan",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "GBJNJB4N"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Language to Rewards for Robotic Skill Synthesis",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Wenhao",
+        "lastName": "Yu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Nimrod",
+        "lastName": "Gileadi"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Chuyuan",
+        "lastName": "Fu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Sean",
+        "lastName": "Kirmani"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Kuang-Huei",
+        "lastName": "Lee"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Montse Gonzalez",
+        "lastName": "Arenas"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Hao-Tien Lewis",
+        "lastName": "Chiang"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Tom",
+        "lastName": "Erez"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Leonard",
+        "lastName": "Hasenclever"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jan",
+        "lastName": "Humplik"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Brian",
+        "lastName": "Ichter"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ted",
+        "lastName": "Xiao"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Peng",
+        "lastName": "Xu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Andy",
+        "lastName": "Zeng"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Tingnan",
+        "lastName": "Zhang"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Nicolas",
+        "lastName": "Heess"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Dorsa",
+        "lastName": "Sadigh"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jie",
+        "lastName": "Tan"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Yuval",
+        "lastName": "Tassa"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Fei",
+        "lastName": "Xia"
+      }
+    ],
+    "date": "2023-06-14",
+    "abstractNote": "Large language models (LLMs) have demonstrated exciting progress in acquiring diverse new capabilities through in-context learning, ranging from logical reasoning to code-writing. Robotics researchers have also explored using LLMs to advance the capabilities of robotic control. However, since low-level robot actions are hardware-dependent and underrepresented in LLM training corpora, existing efforts in applying LLMs to robotics have largely treated LLMs as semantic planners or relied on human-engineered control primitives to interface with the robot. On the other hand, reward functions are shown to be flexible representations that can be optimized for control policies to achieve diverse tasks, while their semantic richness makes them suitable to be specified by LLMs. In this work, we introduce a new paradigm that harnesses this realization by utilizing LLMs to define reward parameters that can be optimized and accomplish variety of robotic tasks. Using reward as the intermediate interface generated by LLMs, we can effectively bridge the gap between high-level language instructions or corrections to low-level robot actions. Meanwhile, combining this with a real-time optimizer, MuJoCo MPC, empowers an interactive behavior creation experience where users can immediately observe the results and provide feedback to the system. To systematically evaluate the performance of our proposed method, we designed a total of 17 tasks for a simulated quadruped robot and a dexterous manipulator robot. We demonstrate that our proposed method reliably tackles 90% of the designed tasks, while a baseline using primitive skills as the interface with Code-as-policies achieves 50% of the tasks. We further validated our method on a real robot arm where complex manipulation skills such as non-prehensile pushing emerge through our interactive system.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2306.08647",
+    "url": "https://arxiv.org/abs/2306.08647",
+    "DOI": "",
+    "arxiv": "2306.08647",
+    "source": "arxiv",
+    "key": "yu2023l2r",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "H2DQRBWA"
+  },
+  {
+    "itemType": "preprint",
+    "title": "NARRATE: Versatile Language Architecture for Optimal Control in Robotics",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Seif",
+        "lastName": "Ismail"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Antonio",
+        "lastName": "Arbues"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ryan",
+        "lastName": "Cotterell"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "René",
+        "lastName": "Zurbrügg"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Carmen Amo",
+        "lastName": "Alonso"
+      }
+    ],
+    "date": "2024-03-16",
+    "abstractNote": "The impressive capabilities of Large Language Models (LLMs) have led to various efforts to enable robots to be controlled through natural language instructions, opening exciting possibilities for human-robot interaction The goal is for the motor-control task to be performed accurately, efficiently and safely while also enjoying the flexibility imparted by LLMs to specify and adjust the task through natural language. In this work, we demonstrate how a careful layering of an LLM in combination with a Model Predictive Control (MPC) formulation allows for accurate and flexible robotic control via natural language while taking into consideration safety constraints. In particular, we rely on the LLM to effectively frame constraints and objective functions as mathematical expressions, which are later used in the motor-control module via MPC. The transparency of the optimization formulation allows for interpretability of the task and enables adjustments through human feedback. We demonstrate the validity of our method through extensive experiments on long-horizon reasoning, contact-rich, and multi-object interaction tasks. Our evaluations show that NARRATE outperforms current existing methods on these benchmarks and effectively transfers to the real world on two different embodiments. Videos, Code and Prompts at narrate-mpc.github.io",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2403.10762",
+    "url": "https://arxiv.org/abs/2403.10762",
+    "DOI": "",
+    "arxiv": "2403.10762",
+    "source": "arxiv",
+    "key": "ismail2024narrate",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "V3XUI23F"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Caging Vision-Language Navigation for Legged Robots via Barrier-Certified Safety Architecture",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Abhijeet M.",
+        "lastName": "Kulkarni"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Saimouli",
+        "lastName": "Katragadda"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Yuze",
+        "lastName": "Du"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Zijun",
+        "lastName": "Sha"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Guoquan",
+        "lastName": "Huang"
+      }
+    ],
+    "date": "2026-11-03",
+    "abstractNote": "By harnessing the inherent commonsense capabilities of pretrained Large Language Models (LLMs) and Vision-Language Models (VLMs), current Vision-Language Action(VLA) models for legged robots excel at interpreting language-based navigation commands but lack the physical grounding and explicit safety assurance required for real-world operation. Therefore, this paper aims to cage Legged-Vision-Language Navigation (VLN) through a safety architecture that provides physical grounding and ensures navigation safety. The key idea is not to abandon the powerful capabilities of end-to-end VLA planning, but rather to augment and cage them. In particular, we integrate a high-level VLA planner with a low-level physical-grounding layer that leverages efficient state estimation, in-situ 3D spatial perception, and an Signed Distance Field (SDF) representation to generate executable trajectories. We provide a navigation planner with provable collision-avoidance guarantees under the stated assumptions by combining a low-dimensional Bezier-parameterized MPPI planner with Discrete Exponential Barrier Function (dEBF) constraints. The proposed Legged-VLN system is modular, making it compatible with various VLM/VLA models and agnostic to the robot platform. The proposed system is validated with extensive real-world experiments on humanoid and quadrupedal robots, demonstrating versatile, efficient, and safe vision-language driven navigation capabilities.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2611.04972",
+    "url": "https://arxiv.org/abs/2611.04972",
+    "DOI": "",
+    "arxiv": "2611.04972",
+    "source": "arxiv",
+    "key": "kulkarni2026caging",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "RJ9KHNTA"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Hey Robot! Personalizing Robot Navigation through Model Predictive Control with a Large Language Model",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Diego",
+        "lastName": "Martinez-Baselga"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Oscar de",
+        "lastName": "Groot"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Luzia",
+        "lastName": "Knoedler"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Javier",
+        "lastName": "Alonso-Mora"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Luis",
+        "lastName": "Riazuelo"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Luis",
+        "lastName": "Montano"
+      }
+    ],
+    "date": "2024-09-20",
+    "abstractNote": "Robot navigation methods allow mobile robots to operate in applications such as warehouses or hospitals. While the environment in which the robot operates imposes requirements on its navigation behavior, most existing methods do not allow the end-user to configure the robot's behavior and priorities, possibly leading to undesirable behavior (e.g., fast driving in a hospital). We propose a novel approach to adapt robot motion behavior based on natural language instructions provided by the end-user. Our zero-shot method uses an existing Visual Language Model to interpret a user text query or an image of the environment. This information is used to generate the cost function and reconfigure the parameters of a Model Predictive Controller, translating the user's instruction to the robot's motion behavior. This allows our method to safely and effectively navigate in dynamic and challenging environments. We extensively evaluate our method's individual components and demonstrate the effectiveness of our method on a ground robot in simulation and real-world experiments, and across a variety of environments and user specifications.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2409.13393",
+    "url": "https://arxiv.org/abs/2409.13393",
+    "DOI": "",
+    "arxiv": "2409.13393",
+    "source": "arxiv",
+    "key": "martinezbaselga2024heyrobot",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "E7H3R32J"
+  },
+  {
+    "key": "lecun2022path",
+    "itemType": "report",
+    "title": "A Path Towards Autonomous Machine Intelligence",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Yann",
+        "lastName": "LeCun"
+      }
+    ],
+    "date": "2022",
+    "url": "https://openreview.net/forum?id=BZ5a1r-kVsf",
+    "extra": "OpenReview preprint, version 0.9.2",
+    "source": "manual",
+    "tags": [
+      "cited-in-paper"
+    ],
+    "zotero_key": "S6HSWDJA"
+  },
+  {
+    "itemType": "conferencePaper",
+    "title": "Learning Forward Dynamics Model and Informed Trajectory Sampler for Safe Quadruped Navigation",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Yunho",
+        "lastName": "Kim"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Chanyoung",
+        "lastName": "Kim"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jemin",
+        "lastName": "Hwangbo"
+      }
+    ],
+    "date": "2022-6-27",
+    "DOI": "10.15607/rss.2022.xviii.069",
+    "url": "https://doi.org/10.15607/rss.2022.xviii.069",
+    "source": "crossref",
+    "proceedingsTitle": "Robotics: Science and Systems XVIII",
+    "pages": "",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "TJGTUUFH"
+  },
+  {
+    "itemType": "journalArticle",
+    "title": "Control Barrier Function for Aligning Large Language Models",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Yuya",
+        "lastName": "Miyaoka"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Masaki",
+        "lastName": "Inoue"
+      }
+    ],
+    "date": "2026-7",
+    "DOI": "10.1109/tcst.2026.3675329",
+    "url": "https://doi.org/10.1109/tcst.2026.3675329",
+    "source": "crossref",
+    "publicationTitle": "IEEE Transactions on Control Systems Technology",
+    "volume": "34",
+    "issue": "4",
+    "pages": "1821-1830",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "ATT7NNZ8"
+  },
+  {
+    "itemType": "preprint",
+    "title": "DR-VLA: Learning Human-Like Quadruped Navigation from Egocentric Web Videos via Domain-Invariant Scene Representations",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Jun",
+        "lastName": "Tian"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Yingjie",
+        "lastName": "Niu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ruo",
+        "lastName": "Chen"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Hongyi",
+        "lastName": "Lin"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Chao",
+        "lastName": "Li"
+      }
+    ],
+    "date": "2026-10-13",
+    "abstractNote": "Quadruped robots performing outdoor deliveries must interpret complex scenes, anticipate changes, and navigate in socially compliant ways. Robot demonstrations are costly to collect at the scale needed for generalization. Egocentric web videos offer abundant human navigation experience, but differences in viewpoint and motion make this experience difficult to transfer to robots. We introduce DR-VLA, a Mixture-of-Transformers framework that transfers human navigation experience through a domain-invariant scene representation (DISR). The framework combines vision-language understanding and latent world modeling with a flow-matching action expert. We introduce EgoLynx, comprising 10,000 hours of curated egocentric web video (EgoLynx-Web) and 2,000 clips of teleoperated robot navigation collected during real-world deliveries (EgoLynx-Robot). We pretrain the understanding and world experts on EgoLynx-Web without action labels, then adapt the model to robot observations and train the action expert on EgoLynx-Robot to predict executable trajectories. We also propose the Quadruped Navigation Score (QNS), a pseudo-closed-loop metric combining safety, instruction compliance, comfort, and progress. On the held-out EgoLynx-Robot test split, DR-VLA improves QNS by approximately 5% and reduces open-loop final heading error (FHE) by 14.6%, each relative to the best competing result for that metric. Ablations show that web-video pretraining improves generalization and that the model's key components contribute to performance. As a future-prediction target, DISR outperforms five generic visual representations and yields performance close to task-specific 3D perception without dedicated geometric labels or point clouds for target construction. Trained separately on NAVSIM v1 without web pretraining, DR-VLA achieves 92.1 PDMS, suggesting that the framework also applies to autonomous driving.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2610.18373",
+    "url": "https://arxiv.org/abs/2610.18373",
+    "DOI": "",
+    "arxiv": "2610.18373",
+    "source": "arxiv",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "UH3SJIGC"
+  },
+  {
+    "itemType": "conferencePaper",
+    "title": "Dream to Fly: Model-Based Reinforcement Learning for Vision-Based Drone Flight",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Angel",
+        "lastName": "Romero"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ashwin",
+        "lastName": "Shenai"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ismail",
+        "lastName": "Geles"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Elie",
+        "lastName": "Aljalbout"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Davide",
+        "lastName": "Scaramuzza"
+      }
+    ],
+    "date": "2026-6",
+    "DOI": "10.1109/icra57385.2026.11695931",
+    "url": "https://doi.org/10.1109/icra57385.2026.11695931",
+    "source": "crossref",
+    "proceedingsTitle": "2026 IEEE International Conference on Robotics and Automation (ICRA)",
+    "pages": "15983-15990",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "KNE2MH2S"
+  },
+  {
+    "itemType": "conferencePaper",
+    "title": "Explicit Solutions for Safety Problems Using Control Barrier Functions",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Han",
+        "lastName": "Wang"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Kostas",
+        "lastName": "Margellos"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Antonis",
+        "lastName": "Papachristodoulou"
+      }
+    ],
+    "date": "2022-12-6",
+    "DOI": "10.1109/cdc51059.2022.9993181",
+    "url": "https://doi.org/10.1109/cdc51059.2022.9993181",
+    "source": "crossref",
+    "proceedingsTitle": "2022 IEEE 61st Conference on Decision and Control (CDC)",
+    "pages": "5680-5685",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "EZF7WZSC"
+  },
+  {
+    "itemType": "conferencePaper",
+    "title": "Fast Traversability Estimation for Wild Visual Navigation",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Jonas",
+        "lastName": "Frey"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Matias",
+        "lastName": "Mattamala"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Nived",
+        "lastName": "Chebrolu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Cesar",
+        "lastName": "Cadena"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Maurice",
+        "lastName": "Fallon"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Marco",
+        "lastName": "Hutter"
+      }
+    ],
+    "date": "2023-7-10",
+    "DOI": "10.15607/rss.2023.xix.054",
+    "url": "https://doi.org/10.15607/rss.2023.xix.054",
+    "source": "crossref",
+    "proceedingsTitle": "Robotics: Science and Systems XIX",
+    "pages": "",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "E4B9NIWX"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Geometry-Aware Predictive Safety Filters on Humanoids: From Poisson Safety Functions to CBF Constrained MPC",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Ryan M.",
+        "lastName": "Bena"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Gilbert",
+        "lastName": "Bahati"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Blake",
+        "lastName": "Werner"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ryan K.",
+        "lastName": "Cosner"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Lizhi",
+        "lastName": "Yang"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Aaron D.",
+        "lastName": "Ames"
+      }
+    ],
+    "date": "2025-08-15",
+    "abstractNote": "Autonomous navigation through unstructured and dynamically-changing environments is a complex task that continues to present many challenges for modern roboticists. In particular, legged robots typically possess manipulable asymmetric geometries which must be considered during safety-critical trajectory planning. This work proposes a predictive safety filter: a nonlinear model predictive control (MPC) algorithm for online trajectory generation with geometry-aware safety constraints based on control barrier functions (CBFs). Critically, our method leverages Poisson safety functions to numerically synthesize CBF constraints directly from perception data. We extend the theoretical framework for Poisson safety functions to incorporate temporal changes in the domain by reformulating the static Dirichlet problem for Poisson's equation as a parameterized moving boundary value problem. Furthermore, we employ Minkowski set operations to lift the domain into a configuration space that accounts for robot geometry. Finally, we implement our real-time predictive safety filter on humanoid and quadruped robots in various safety-critical scenarios. The results highlight the versatility of Poisson safety functions, as well as the benefit of CBF constrained model predictive safety-critical controllers.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2508.11129",
+    "url": "https://arxiv.org/abs/2508.11129",
+    "DOI": "",
+    "arxiv": "2508.11129",
+    "source": "arxiv",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "P8TZDBXA"
+  },
+  {
+    "itemType": "conferencePaper",
+    "title": "STONE Dataset: A Scalable Multi-Modal Surround-View 3D Traversability Dataset for Off-Road Robot Navigation",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Konyul",
+        "lastName": "Park"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Daehun",
+        "lastName": "Kim"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jiyong",
+        "lastName": "Oh"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Seunghoon",
+        "lastName": "Yu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Junseo",
+        "lastName": "Park"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jaehyun",
+        "lastName": "Park"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Hongjae",
+        "lastName": "Shin"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Hyungchan",
+        "lastName": "Cho"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jungho",
+        "lastName": "Kim"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jun Won",
+        "lastName": "Choi"
+      }
+    ],
+    "date": "2026-6",
+    "DOI": "10.1109/icra57385.2026.11695784",
+    "url": "https://doi.org/10.1109/icra57385.2026.11695784",
+    "source": "crossref",
+    "proceedingsTitle": "2026 IEEE International Conference on Robotics and Automation (ICRA)",
+    "pages": "2370-2377",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "WMEDE4AS"
+  },
+  {
+    "itemType": "conferencePaper",
+    "title": "Hierarchical Open-Vocabulary 3D Scene Graphs for Language-Grounded Robot Navigation",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Abdelrhman",
+        "lastName": "Werby"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Chenguang",
+        "lastName": "Huang"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Martin",
+        "lastName": "Büchner"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Abhinav",
+        "lastName": "Valada"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Wolfram",
+        "lastName": "Burgard"
+      }
+    ],
+    "date": "2024-7-15",
+    "DOI": "10.15607/rss.2024.xx.077",
+    "url": "https://doi.org/10.15607/rss.2024.xx.077",
+    "source": "crossref",
+    "proceedingsTitle": "Robotics: Science and Systems XX",
+    "pages": "",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "K3IG2S53"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Learning Task-Invariant Properties via Dreamer: Enabling Efficient Policy Transfer for Quadruped Robots",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Junyang",
+        "lastName": "Liang"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Yuxuan",
+        "lastName": "Liu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Yabin",
+        "lastName": "Chang"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Junfan",
+        "lastName": "Lin"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Junkai",
+        "lastName": "Ji"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Hui",
+        "lastName": "Li"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Changxin",
+        "lastName": "Huang"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jianqiang",
+        "lastName": "Li"
+      }
+    ],
+    "date": "2026-04-03",
+    "abstractNote": "Achieving quadruped robot locomotion across diverse and dynamic terrains presents significant challenges, primarily due to the discrepancies between simulation environments and real-world conditions. Traditional sim-to-real transfer methods often rely on manual feature design or costly real-world fine-tuning. To address these limitations, this paper proposes the DreamTIP framework, which incorporates Task-Invariant Properties learning within the Dreamer world model architecture to enhance sim-to-real transfer capabilities. Guided by large language models, DreamTIP identifies and leverages Task-Invariant Properties, such as contact stability and terrain clearance, which exhibit robustness to dynamic variations and strong transferability across tasks. These properties are integrated into the world model as auxiliary prediction targets, enabling the policy to learn representations that are insensitive to underlying dynamic changes. Furthermore, an efficient adaptation strategy is designed, employing a mixed replay buffer and regularization constraints to rapidly calibrate to real-world dynamics while effectively mitigating representation collapse and catastrophic forgetting. Extensive experiments on complex terrains, including Stair, Climb, Tilt, and Crawl, demonstrate that DreamTIP significantly outperforms state-of-the-art baselines in both simulated and real-world environments. Our method achieves an average performance improvement of 28.1% across eight distinct simulated transfer tasks. In the real-world Climb task, the baseline method achieved only a 10\\ success rate, whereas our method attained a 100% success rate. These results indicate that incorporating Task-Invariant Properties into Dreamer learning offers a novel solution for achieving robust and transferable robot locomotion.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2604.02911",
+    "url": "https://arxiv.org/abs/2604.02911",
+    "DOI": "",
+    "arxiv": "2604.02911",
+    "source": "arxiv",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "89PMBBG4"
+  },
+  {
+    "itemType": "preprint",
+    "title": "RT-Trajectory: Robotic Task Generalization via Hindsight Trajectory Sketches",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Jiayuan",
+        "lastName": "Gu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Sean",
+        "lastName": "Kirmani"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Paul",
+        "lastName": "Wohlhart"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Yao",
+        "lastName": "Lu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Montserrat Gonzalez",
+        "lastName": "Arenas"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Kanishka",
+        "lastName": "Rao"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Wenhao",
+        "lastName": "Yu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Chuyuan",
+        "lastName": "Fu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Keerthana",
+        "lastName": "Gopalakrishnan"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Zhuo",
+        "lastName": "Xu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Priya",
+        "lastName": "Sundaresan"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Peng",
+        "lastName": "Xu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Hao",
+        "lastName": "Su"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Karol",
+        "lastName": "Hausman"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Chelsea",
+        "lastName": "Finn"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Quan",
+        "lastName": "Vuong"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ted",
+        "lastName": "Xiao"
+      }
+    ],
+    "date": "2023-11-03",
+    "abstractNote": "Generalization remains one of the most important desiderata for robust robot learning systems. While recently proposed approaches show promise in generalization to novel objects, semantic concepts, or visual distribution shifts, generalization to new tasks remains challenging. For example, a language-conditioned policy trained on pick-and-place tasks will not be able to generalize to a folding task, even if the arm trajectory of folding is similar to pick-and-place. Our key insight is that this kind of generalization becomes feasible if we represent the task through rough trajectory sketches. We propose a policy conditioning method using such rough trajectory sketches, which we call RT-Trajectory, that is practical, easy to specify, and allows the policy to effectively perform new tasks that would otherwise be challenging to perform. We find that trajectory sketches strike a balance between being detailed enough to express low-level motion-centric guidance while being coarse enough to allow the learned policy to interpret the trajectory sketch in the context of situational visual observations. In addition, we show how trajectory sketches can provide a useful interface to communicate with robotic policies: they can be specified through simple human inputs like drawings or videos, or through automated methods such as modern image-generating or waypoint-generating methods. We evaluate RT-Trajectory at scale on a variety of real-world robotic tasks, and find that RT-Trajectory is able to perform a wider range of tasks compared to language-conditioned and goal-conditioned policies, when provided the same training data.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2311.01977",
+    "url": "https://arxiv.org/abs/2311.01977",
+    "DOI": "",
+    "arxiv": "2311.01977",
+    "source": "arxiv",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "GNQTB897"
+  },
+  {
+    "itemType": "conferencePaper",
+    "title": "SemantI-Nav: Human-Guided Imitation Learning for Safe Quadruped Navigation on Construction Sites",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Liqun",
+        "lastName": "Xu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Dharmaraj",
+        "lastName": "Veeramani"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Zhenhua",
+        "lastName": "Zhu"
+      }
+    ],
+    "date": "2026-6-22",
+    "DOI": "10.22260/isarc2026/0033",
+    "url": "https://doi.org/10.22260/isarc2026/0033",
+    "source": "crossref",
+    "proceedingsTitle": "Proceedings of the International Symposium on Automation and Robotics in Construction (IAARC)",
+    "pages": "",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "USMSUAN2"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Semantic Navigation Using Building Information on Construction Sites",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Sina",
+        "lastName": "Karimi"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Rafael Gomes",
+        "lastName": "Braga"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ivanka",
+        "lastName": "Iordanova"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "David",
+        "lastName": "St-Onge"
+      }
+    ],
+    "date": "2021-04-21",
+    "abstractNote": "With the growth in automated data collection of construction projects, the need for semantic navigation of mobile robots is increasing. In this paper, we propose an infrastructure to leverage building-related information for smarter, safer and more precise robot navigation during construction phase. Our use of Building Information Models (BIM) in robot navigation is twofold: (1) the intuitive semantic information enables non-experts to deploy robots and (2) the semantic data exposed to the navigation system allows optimal path planning (not necessarily the shortest one). Our Building Information Robotic System (BIRS) uses Industry Foundation Classes (IFC) as the interoperable data format between BIM and the Robotic Operating System (ROS). BIRS generates topological and metric maps from BIM for ROS usage. An optimal path planer, integrating critical components for construction assessment is proposed using a cascade strategy (global versus local). The results are validated through series of experiments in construction sites.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2104.10296",
+    "url": "https://arxiv.org/abs/2104.10296",
+    "DOI": "",
+    "arxiv": "2104.10296",
+    "source": "arxiv",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "XEGCS6F7"
+  },
+  {
+    "itemType": "conferencePaper",
+    "title": "VLMPC: Vision-Language Model Predictive Control for Robotic Manipulation",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Wentao",
+        "lastName": "Zhao"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jiaming",
+        "lastName": "Chen"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ziyu",
+        "lastName": "Meng"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Donghui",
+        "lastName": "Mao"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ran",
+        "lastName": "Song"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Wei",
+        "lastName": "Zhang"
+      }
+    ],
+    "date": "2024-7-15",
+    "DOI": "10.15607/rss.2024.xx.106",
+    "url": "https://doi.org/10.15607/rss.2024.xx.106",
+    "source": "crossref",
+    "proceedingsTitle": "Robotics: Science and Systems XX",
+    "pages": "",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "JUX6UZSB"
+  },
+  {
+    "itemType": "journalArticle",
+    "title": "Foundations of spatial perception for robotics: Hierarchical representations and real-time systems",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Nathan",
+        "lastName": "Hughes"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Yun",
+        "lastName": "Chang"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Siyi",
+        "lastName": "Hu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Rajat",
+        "lastName": "Talak"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Rumaia",
+        "lastName": "Abdulhai"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jared",
+        "lastName": "Strader"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Luca",
+        "lastName": "Carlone"
+      }
+    ],
+    "date": "2024-2-12",
+    "DOI": "10.1177/02783649241229725",
+    "url": "https://doi.org/10.1177/02783649241229725",
+    "source": "crossref",
+    "publicationTitle": "The International Journal of Robotics Research",
+    "volume": "43",
+    "issue": "10",
+    "pages": "1457-1505",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "DQNR3CVP"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Quadrupped-Legged Robot Movement Plan Generation using Large Language Model",
+    "creators": [
+      {
+        "creatorType": "author",
+        "name": "Muhtadin"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Vincentius Gusti Putu A. B.",
+        "lastName": "M."
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ahmad",
+        "lastName": "Zaini"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Mauridhi Hery",
+        "lastName": "Purnomo"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "I Ketut Eddy",
+        "lastName": "Purnama"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Chastine",
+        "lastName": "Fatichah"
+      }
+    ],
+    "date": "2025-12-24",
+    "abstractNote": "Traditional control interfaces for quadruped robots often impose a high barrier to entry, requiring specialized technical knowledge for effective operation. To address this, this paper presents a novel control framework that integrates Large Language Models (LLMs) to enable intuitive, natural language-based navigation. We propose a distributed architecture where high-level instruction processing is offloaded to an external server to overcome the onboard computational constraints of the DeepRobotics Jueying Lite 3 platform. The system grounds LLM-generated plans into executable ROS navigation commands using real-time sensor fusion (LiDAR, IMU, and Odometry). Experimental validation was conducted in a structured indoor environment across four distinct scenarios, ranging from single-room tasks to complex cross-zone navigation. The results demonstrate the system's robustness, achieving an aggregate success rate of over 90\\% across all scenarios, validating the feasibility of offloaded LLM-based planning for autonomous quadruped deployment in real-world settings.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2512.21293",
+    "url": "https://arxiv.org/abs/2512.21293",
+    "DOI": "10.1109/CENIM67940.2025.11326112",
+    "arxiv": "2512.21293",
+    "source": "arxiv",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "T6JR4EPJ"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Benchmarking World Models for Continual Learning on Compositional Tasks",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Haoyu",
+        "lastName": "Zhou"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Joe",
+        "lastName": "Watson"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Anson",
+        "lastName": "Lei"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ingmar",
+        "lastName": "Posner"
+      }
+    ],
+    "date": "2026-09-18",
+    "abstractNote": "A desirable property of a world model is the ability to learn continually across tasks, adapting to new environments without forgetting what the agent has already learnt. In particular, the ability to retain and reuse knowledge obtained from prior experiences underpins an agent's ability to efficiently adapt to novel environments, as the dynamics of the physical world can often be described in recurring mechanisms. However, the world model's measure of adaptation entangles two abilities: the speed and capacity to learn unseen tasks, and the reuse of knowledge already acquired, since incoming tasks carry novel content alongside what recurs. In order to isolate knowledge reuse from prior experiences, we propose a compositional continual learning benchmark for world models in robot manipulation. Specifically, we design each task curriculum with compositional tasks that combine aspects of the tasks seen in the sequence. We further factorise this composition along the axes of action and perception to better understand how different input modalities bottleneck knowledge reuse. We evaluate state-of-the-art world models under canonical continual learning methods, alongside a modular world model whose dynamics backbone contains explicitly reusable components. Results show that modularity balances reuse against forgetting better than conventional methods, but none solve the problem fully, leaving clear room for continual world models built to reuse without forgetting. More details are available on our project website: https://object814.github.io/Compositional-Continual-Learning/.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2609.22055",
+    "url": "https://arxiv.org/abs/2609.22055",
+    "DOI": "",
+    "arxiv": "2609.22055",
+    "source": "arxiv",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "VIMGT2HX"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Behavioral Conflict Avoidance Between Humans and Quadruped Robots in Shared Environments",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Shuang",
+        "lastName": "Wei"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Muhua",
+        "lastName": "Zhang"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Yun",
+        "lastName": "Gan"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Deqing",
+        "lastName": "Huang"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Lei",
+        "lastName": "Ma"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Chenguang",
+        "lastName": "Yang"
+      }
+    ],
+    "date": "2025-03-21",
+    "abstractNote": "Nowadays, robots are increasingly operated in environments shared with humans, where conflicts between human and robot behaviors may compromise safety. This paper presents a proactive behavioral conflict avoidance framework based on the principle of adaptation to trends for quadruped robots that not only ensures the robot's safety but also minimizes interference with human activities. It can proactively avoid potential conflicts with approaching humans or other dynamic objects, whether the robot is stationary or in motion, then swiftly resume its tasks once the conflict subsides. An enhanced approach is proposed to achieve precise human detection and tracking on vibratory robot platform equipped with low-cost hybrid solid-state LiDAR. When potential conflict detected, the robot selects an avoidance point and executes an evasion maneuver before resuming its task. This approach contrasts with conventional methods that remain goal-driven, often resulting in aggressive behaviors, such as forcibly bypassing obstacles and causing conflicts or becoming stuck in deadlock scenarios. The selection of avoidance points is achieved by integrating static and dynamic obstacle to generate a potential field map. The robot then searches for feasible regions within this map and determines the optimal avoidance point using an evaluation function. Experimental results demonstrate that the framework significantly reduces interference with human activities, enhances the safety of both robots and persons.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2503.17014",
+    "url": "https://arxiv.org/abs/2503.17014",
+    "DOI": "",
+    "arxiv": "2503.17014",
+    "source": "arxiv",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "DHSGT2QG"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Control Barrier Functions: Theory and Applications",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Aaron D.",
+        "lastName": "Ames"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Samuel",
+        "lastName": "Coogan"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Magnus",
+        "lastName": "Egerstedt"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Gennaro",
+        "lastName": "Notomista"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Koushil",
+        "lastName": "Sreenath"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Paulo",
+        "lastName": "Tabuada"
+      }
+    ],
+    "date": "2019-03-27",
+    "abstractNote": "This paper provides an introduction and overview of recent work on control barrier functions and their use to verify and enforce safety properties in the context of (optimization based) safety-critical controllers. We survey the main technical results and discuss applications to several domains including robotic systems.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:1903.11199",
+    "url": "https://arxiv.org/abs/1903.11199",
+    "DOI": "",
+    "arxiv": "1903.11199",
+    "source": "arxiv",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "IUF7PUGC"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Cybersecurity of Teleoperated Quadruped Robots: A Systematic Survey of Vulnerabilities, Threats, and Open Defense Gaps",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Mohammad",
+        "lastName": "Sabouri"
+      }
+    ],
+    "date": "2026-02-26",
+    "abstractNote": "Teleoperated quadruped robots are increasingly deployed in safety-critical missions -- industrial inspection, military reconnaissance, and emergency response -- yet the security of their communication and control infrastructure remains insufficiently characterized. Quadrupeds present distinct security challenges arising from dynamic stability constraints, gait-dependent vulnerability windows, substantial kinetic energy, and elevated operator cognitive load. This survey synthesizes peer-reviewed literature and vulnerability disclosures (2019--2025) to provide comprehensive analysis of cybersecurity threats, consequences, and countermeasures for teleoperated quadruped systems. We contribute: (i) a six-layer attack taxonomy spanning perception manipulation, VR/AR operator targeting, communication disruption, control signal attacks, localization spoofing, and network intrusion; (ii) systematic attack-to-consequence mapping with timing characterization; (iii) Technology Readiness Level classification exposing critical maturity gaps between field-deployed communication protections (TRL 7--9) and experimental perception/operator-layer defenses (TRL 3--5); (iv) comparative security analysis of six commercial platforms; (v) pragmatic deployment guidance stratified by implementation timeline; and (vi) eight prioritized research gaps with implementation roadmaps. Limitations: Platform assessments rely on publicly available information. Attack success rates derive from cited studies under controlled conditions and require domain-specific validation.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2602.23404",
+    "url": "https://arxiv.org/abs/2602.23404",
+    "DOI": "",
+    "arxiv": "2602.23404",
+    "source": "arxiv",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "GIW4NIFE"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Dynamic Object Detection and Tracking in Construction: A Fisheye Camera and LiDAR Sensor Fusion Model",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Yilong",
+        "lastName": "Chen"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Huili",
+        "lastName": "Huang"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Yong K.",
+        "lastName": "Cho"
+      }
+    ],
+    "date": "2026-07-08",
+    "abstractNote": "Robust dynamic object detection and tracking are essential for enabling robots to operate safely and effectively alongside humans in complex environments such as construction sites. While LiDAR-based SLAM and occupancy grid methods offer viable solutions for detecting and tracking motion, many state-of-the-art 3D vision approaches rely heavily on pre-trained neural networks and require additional post-processing to identify moving objects. Sensor fusion techniques, combining the precision of LiDAR with the semantic richness of RGB imagery, offer a promising alternative. In this work, we present a novel framework that enhances a quadruped robot equipped with a LiDAR sensor and an upward-facing fisheye camera for real-time dynamic object detection and tracking. After identifying moving objects within a registered point cloud, our method assigns semantic labels by projecting 3D coordinates onto a 2D cylindrical panorama, aligning with real-time image-based detections for observation update of the Kalman filter. The proposed system demonstrates high precision, simplicity, and robustness, particularly in handling objects transitioning between dynamic and static states, thus it is well-suited for deployment in real-world construction environments.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2607.06896",
+    "url": "https://arxiv.org/abs/2607.06896",
+    "DOI": "",
+    "arxiv": "2607.06896",
+    "source": "arxiv",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "I662FCK8"
+  },
+  {
+    "itemType": "preprint",
+    "title": "EfficientTDMPC: Improved MPC Objectives for Sample-Efficient Continuous Control",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Thomas",
+        "lastName": "Evers"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Cristian",
+        "lastName": "Meo"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Wendelin",
+        "lastName": "Bohmer"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Justin",
+        "lastName": "Dauwels"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Yaniv",
+        "lastName": "Oren"
+      }
+    ],
+    "date": "2026-05-15",
+    "abstractNote": "We introduce EfficientTDMPC, a sample-efficient model-based reinforcement learning method for continuous control built on the TD-MPC family of algorithms. Central to this family is a planner that aims to find an action sequence that maximizes the estimated return. The return is estimated using a learned model and value networks, each of which can introduce error. EfficientTDMPC introduces three contributions that improve performance by aiming to reduce this error. First, we introduce a multi-horizon planning objective that evaluates the value at different rollout depths and averages them. Second, to our knowledge we are the first to train a value-equivalent dynamics ensemble. Our improved objective then averages over rollouts from multiple dynamics heads. Third, we add pessimistic reanalyze for tasks that can terminate early. Applying our contributions to a recent baseline (BMPC) yields EfficientTDMPC, which to our knowledge is the new state of the art in sample efficiency on HumanoidBench and the DeepMind Control Suite, reaching BMPC's final aggregated performance using 57\\% fewer environment steps.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2605.16692",
+    "url": "https://arxiv.org/abs/2605.16692",
+    "DOI": "",
+    "arxiv": "2605.16692",
+    "source": "arxiv",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "5WKG8TN6"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Explicit Control Barrier Function-based Safety Filters and their Resource-Aware Computation",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Pol",
+        "lastName": "Mestres"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Shima Sadat",
+        "lastName": "Mousavi"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Pio",
+        "lastName": "Ong"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Lizhi",
+        "lastName": "Yang"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ersin",
+        "lastName": "Das"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Joel W.",
+        "lastName": "Burdick"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Aaron D.",
+        "lastName": "Ames"
+      }
+    ],
+    "date": "2025-12-10",
+    "abstractNote": "This paper studies the efficient implementation of safety filters that are designed using control barrier functions (CBFs), which minimally modify a nominal controller to render it safe with respect to a prescribed set of states. Although CBF-based safety filters are often implemented by solving a quadratic program (QP) in real time, the use of off-the-shelf solvers for such optimization problems poses a challenge in applications where control actions need to be computed efficiently at very high frequencies. In this paper, we introduce a closed-form expression for controllers obtained through CBF-based safety filters. This expression is obtained by partitioning the state-space into different regions, with a different closed-form solution in each region. We leverage this formula to introduce a resource-aware implementation of CBF-based safety filters that detects changes in the partition region and uses the closed-form expression between changes. We showcase the applicability of our approach in examples ranging from aerospace control to safe reinforcement learning.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2512.10118",
+    "url": "https://arxiv.org/abs/2512.10118",
+    "DOI": "",
+    "arxiv": "2512.10118",
+    "source": "arxiv",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "2XSTKM69"
+  },
+  {
+    "itemType": "preprint",
+    "title": "HuGo: LLMs as Whole-Body Policy Code Designers for Humanoid Loco-Manipulation",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Seoyeon",
+        "lastName": "Choi"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Shizhao",
+        "lastName": "Ye"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Nicholas",
+        "lastName": "Bui"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Aayushi",
+        "lastName": "Shrivastava"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Kanghyun",
+        "lastName": "Ryu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Dhruva",
+        "lastName": "Tirumala"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Markus",
+        "lastName": "Wulfmeier"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Negar",
+        "lastName": "Mehr"
+      }
+    ],
+    "date": "2026-09-24",
+    "abstractNote": "For humanoids to be useful in everyday environments, they must perform a wide range of tasks that couple locomotion and manipulation. Existing approaches commonly acquire a loco-manipulation policy through reward engineering or demonstrations followed by task-specific training, making it costly to scale to new tasks. In this work, we propose a hierarchical approach to humanoid loco-manipulation that eliminates these per-task requirements. HuGo, Humanoid policy code Generation, uses a Large Language Model (LLM) to generate executable, closed-loop high-level policy code from a task description on top of a frozen low-level whole-body policy. Given the task, observation, and command specifications, the LLM constructs the task logic in code. HuGo then refines the policy from its rollouts using numerical trajectories and selected video frames to produce feedback and targeted code updates. Across five simulation tasks, using two different low-level policies, HuGo substantially outperforms a high-level reinforcement learning baseline and approaches the performance of a demonstration-based baseline. We achieve this level of performance without task-specific reward design or demonstration collection. We further demonstrate zero-shot transfer of simulation-generated policies to hardware and show that applying the same refinement loop to real-world rollouts can further improve transfer performance without expert demonstrations or policy retraining. Project website is https://iconlab.negarmehr.com/HuGo/",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2609.30594",
+    "url": "https://arxiv.org/abs/2609.30594",
+    "DOI": "",
+    "arxiv": "2609.30594",
+    "source": "arxiv",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "6S85D93B"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Hydra++: Real-Time Hierarchical 3D Scene Graph Construction With Object-Level Shape Estimation",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Hyungtae",
+        "lastName": "Lim"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Nathan",
+        "lastName": "Hughes"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Xihang",
+        "lastName": "Yu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ruihan",
+        "lastName": "Xu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Yun",
+        "lastName": "Chang"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jingnan",
+        "lastName": "Shi"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Rajat",
+        "lastName": "Talak"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Luca",
+        "lastName": "Carlone"
+      }
+    ],
+    "date": "2026-07-10",
+    "abstractNote": "3D scene graphs provide a hierarchical abstraction of environments by encoding spatial entities, such as objects and places, and their relationships. However, existing scene graph systems model object geometry coarsely, relying on partial point clouds or class-level CAD templates, which limits instance-specific shape detail. This paper presents Hydra++, a system-level investigation into how learning-based object shape estimators can be integrated into a hierarchical 3D scene graph pipeline. Hydra++ incorporates category-agnostic shape estimation and a reprojection-mask consistency check to reject degenerate predictions from partial observations or imprecise segmentation. In its default CRISP-based configuration, Hydra++ performs online scene graph construction; slower estimators such as SAM3D are evaluated as modular alternatives to demonstrate generalization-latency trade-offs. Furthermore, to address the challenges of sparse and noisy depth measurements in outdoor environments, Hydra++ supports a hybrid LiDAR-camera configuration for large-scale operation, improving scene-level reconstruction quality. Experiments in both simulation and real-world outdoor campus scenarios demonstrate that Hydra++ improves object- and scene-level reconstruction quality. Project page is available at https://hydra-plusplus.github.io/.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2607.09455",
+    "url": "https://arxiv.org/abs/2607.09455",
+    "DOI": "",
+    "arxiv": "2607.09455",
+    "source": "arxiv",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "X2P5B4AN"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Learning Massively Multitask World Models for Continuous Control",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Nicklas",
+        "lastName": "Hansen"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Hao",
+        "lastName": "Su"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Xiaolong",
+        "lastName": "Wang"
+      }
+    ],
+    "date": "2025-11-24",
+    "abstractNote": "General-purpose control demands agents that act across many tasks and embodiments, yet research on reinforcement learning (RL) for continuous control remains dominated by single-task or offline regimes, reinforcing a view that online RL does not scale. Inspired by the foundation model recipe (large-scale pretraining followed by light RL) we ask whether a single agent can be trained on hundreds of tasks with online interaction. To accelerate research in this direction, we introduce a new benchmark with 200 diverse tasks spanning many domains and embodiments, each with language instructions, demonstrations, and optionally image observations. We then present \\emph{Newt}, a language-conditioned multitask world model that is first pretrained on demonstrations to acquire task-aware representations and action priors, and then jointly optimized with online interaction across all tasks. Experiments show that Newt yields better multitask performance and data-efficiency than a set of strong baselines, exhibits strong open-loop control, and enables rapid adaptation to unseen tasks. We release our environments, demonstrations, code for training and evaluation, as well as 200+ checkpoints.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2511.19584",
+    "url": "https://arxiv.org/abs/2511.19584",
+    "DOI": "",
+    "arxiv": "2511.19584",
+    "source": "arxiv",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "N52F9XM5"
+  },
+  {
+    "itemType": "preprint",
+    "title": "RePLan: Robotic Replanning with Perception and Language Models",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Marta",
+        "lastName": "Skreta"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Zihan",
+        "lastName": "Zhou"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jia Lin",
+        "lastName": "Yuan"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Kourosh",
+        "lastName": "Darvish"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Alán",
+        "lastName": "Aspuru-Guzik"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Animesh",
+        "lastName": "Garg"
+      }
+    ],
+    "date": "2024-01-08",
+    "abstractNote": "Advancements in large language models (LLMs) have demonstrated their potential in facilitating high-level reasoning, logical reasoning and robotics planning. Recently, LLMs have also been able to generate reward functions for low-level robot actions, effectively bridging the interface between high-level planning and low-level robot control. However, the challenge remains that even with syntactically correct plans, robots can still fail to achieve their intended goals due to imperfect plans or unexpected environmental issues. To overcome this, Vision Language Models (VLMs) have shown remarkable success in tasks such as visual question answering. Leveraging the capabilities of VLMs, we present a novel framework called Robotic Replanning with Perception and Language Models (RePLan) that enables online replanning capabilities for long-horizon tasks. This framework utilizes the physical grounding provided by a VLM's understanding of the world's state to adapt robot actions when the initial plan fails to achieve the desired goal. We developed a Reasoning and Control (RC) benchmark with eight long-horizon tasks to test our approach. We find that RePLan enables a robot to successfully adapt to unforeseen obstacles while accomplishing open-ended, long-horizon goals, where baseline models cannot, and can be readily applied to real robots. Find more information at https://replan-lm.github.io/replan.github.io/",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2401.04157",
+    "url": "https://arxiv.org/abs/2401.04157",
+    "DOI": "",
+    "arxiv": "2401.04157",
+    "source": "arxiv",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "FST6AZTE"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Scene-Agnostic Traversability Labeling and Estimation via a Multimodal Self-supervised Framework",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Zipeng",
+        "lastName": "Fang"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Yanbo",
+        "lastName": "Wang"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Lei",
+        "lastName": "Zhao"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Weidong",
+        "lastName": "Chen"
+      }
+    ],
+    "date": "2025-08-25",
+    "abstractNote": "Traversability estimation is critical for enabling robots to navigate across diverse terrains and environments. While recent self-supervised learning methods achieve promising results, they often fail to capture the characteristics of non-traversable regions. Moreover, most prior works concentrate on a single modality, overlooking the complementary strengths offered by integrating heterogeneous sensory modalities for more robust traversability estimation. To address these limitations, we propose a multimodal self-supervised framework for traversability labeling and estimation. First, our annotation pipeline integrates footprint, LiDAR, and camera data as prompts for a vision foundation model, generating traversability labels that account for both semantic and geometric cues. Then, leveraging these labels, we train a dual-stream network that jointly learns from different modalities in a decoupled manner, enhancing its capacity to recognize diverse traversability patterns. In addition, we incorporate sparse LiDAR-based supervision to mitigate the noise introduced by pseudo labels. Finally, extensive experiments conducted across urban, off-road, and campus environments demonstrate the effectiveness of our approach. The proposed automatic labeling method consistently achieves around 88% IoU across diverse datasets. Compared to existing self-supervised state-of-the-art methods, our multimodal traversability estimation network yields consistently higher IoU, improving by 1.6-3.5% on all evaluated datasets.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2508.18249",
+    "url": "https://arxiv.org/abs/2508.18249",
+    "DOI": "",
+    "arxiv": "2508.18249",
+    "source": "arxiv",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "PEDCQ7QS"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Security of World-Model-Based Embodied AI: A Lifecycle of Threats, Defenses, and Evaluation",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Fazhong",
+        "lastName": "Liu"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Zhuoyan",
+        "lastName": "Chen"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Haozhen",
+        "lastName": "Tan"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Yan",
+        "lastName": "Meng"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Guoxing",
+        "lastName": "Chen"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Haojin",
+        "lastName": "Zhu"
+      }
+    ],
+    "date": "2026-07-30",
+    "abstractNote": "World models give embodied AI a predictive core: they compress observations into states, simulate action-conditioned futures, and enable planning beyond reactive control. This predictive layer, however, opens a new security boundary-compromise can propagate from data, sensors, prompts, or feedback into physical action. Rather than treating world models as an isolated component, this survey traces threats across their entire lifecycle-from data construction and representation learning, through state grounding and imagination, to trajectory evaluation, execution, and long-term adaptation via memory and tools. We show that familiar attack families: poisoning, backdoors, adversarial examples, sensor spoofing, prompt injection, trajectory manipulation, and supply-chain attacks take on distinct meanings when they corrupt world states, learned dynamics, affordance estimates, or safety costs. We also highlight a duality: world models can serve as runtime safety shields, yet when compromised or over-trusted they generate predictive safety illusions. The survey offers a lifecycle taxonomy, maps existing attacks to world-model security properties, outlines evaluation protocols for safety failures, and structures defenses across provenance, robust grounding, uncertainty-aware prediction, trajectory gating, feedback auditing, and deployment assurance.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2607.28226",
+    "url": "https://arxiv.org/abs/2607.28226",
+    "DOI": "",
+    "arxiv": "2607.28226",
+    "source": "arxiv",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "93VRHEMC"
+  },
+  {
+    "itemType": "preprint",
+    "title": "TD-GRPC: Temporal Difference Learning with Group Relative Policy Constraint for Humanoid Locomotion",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Khang",
+        "lastName": "Nguyen"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Khai",
+        "lastName": "Nguyen"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "An T.",
+        "lastName": "Le"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Jan",
+        "lastName": "Peters"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Manfred",
+        "lastName": "Huber"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Ngo Anh",
+        "lastName": "Vien"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Minh Nhat",
+        "lastName": "Vu"
+      }
+    ],
+    "date": "2025-05-19",
+    "abstractNote": "Robot learning in high-dimensional control settings, such as humanoid locomotion, presents persistent challenges for reinforcement learning (RL) algorithms due to unstable dynamics, complex contact interactions, and sensitivity to distributional shifts during training. Model-based methods, \\textit{e.g.}, Temporal-Difference Model Predictive Control (TD-MPC), have demonstrated promising results by combining short-horizon planning with value-based learning, enabling efficient solutions for basic locomotion tasks. However, these approaches remain ineffective in addressing policy mismatch and instability introduced by off-policy updates. Thus, in this work, we introduce Temporal-Difference Group Relative Policy Constraint (TD-GRPC), an extension of the TD-MPC framework that unifies Group Relative Policy Optimization (GRPO) with explicit Policy Constraints (PC). TD-GRPC applies a trust-region constraint in the latent policy space to maintain consistency between the planning priors and learned rollouts, while leveraging group-relative ranking to assess and preserve the physical feasibility of candidate trajectories. Unlike prior methods, TD-GRPC achieves robust motions without modifying the underlying planner, enabling flexible planning and policy learning. We validate our method across a locomotion task suite ranging from basic walking to highly dynamic movements on the 26-DoF Unitree H1-2 humanoid robot. Through simulation results, TD-GRPC demonstrates its improvements in stability and policy robustness with sampling efficiency while training for complex humanoid control tasks.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2505.13549",
+    "url": "https://arxiv.org/abs/2505.13549",
+    "DOI": "",
+    "arxiv": "2505.13549",
+    "source": "arxiv",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "NT2KPZD7"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Temporal Difference Learning for Model Predictive Control",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Nicklas",
+        "lastName": "Hansen"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Xiaolong",
+        "lastName": "Wang"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Hao",
+        "lastName": "Su"
+      }
+    ],
+    "date": "2022-03-09",
+    "abstractNote": "Data-driven model predictive control has two key advantages over model-free methods: a potential for improved sample efficiency through model learning, and better performance as computational budget for planning increases. However, it is both costly to plan over long horizons and challenging to obtain an accurate model of the environment. In this work, we combine the strengths of model-free and model-based methods. We use a learned task-oriented latent dynamics model for local trajectory optimization over a short horizon, and use a learned terminal value function to estimate long-term return, both of which are learned jointly by temporal difference learning. Our method, TD-MPC, achieves superior sample efficiency and asymptotic performance over prior work on both state and image-based continuous control tasks from DMControl and Meta-World. Code and video results are available at https://nicklashansen.github.io/td-mpc.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2203.04955",
+    "url": "https://arxiv.org/abs/2203.04955",
+    "DOI": "",
+    "arxiv": "2203.04955",
+    "source": "arxiv",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "6SZTMUU9"
+  },
+  {
+    "itemType": "preprint",
+    "title": "Control Barrier Function-Based Quadratic Programming for SafeOperation of Tethered UAVs",
+    "creators": [
+      {
+        "creatorType": "author",
+        "firstName": "Samuel O.",
+        "lastName": "Folorunsho"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "Maggi",
+        "lastName": "Ni"
+      },
+      {
+        "creatorType": "author",
+        "firstName": "William R.",
+        "lastName": "Norris"
+      }
+    ],
+    "date": "2025-02-12",
+    "abstractNote": "Consider an unmanned aerial vehicle (UAV) physically connected to the ground station with a tether operating in a space, tasked with performing precise maneuvers while constrained by the physical limitation of its tether, which prevents it from flying beyond a maximum allowable length. Violating this tether constraint could lead to system failure or operational hazards, making it essential to enforce safety constraints dynamically while ensuring the drone can track desired trajectories accurately. This paper presents a Control Barrier Function Quadratic Programming Framework (CBF-QP) for ensuring the safe and efficient operation of tethered unmanned aerial vehicles (TUAVs). The framework leverages nominal backstepping control to achieve trajectory tracking, augmented with control barrier functions to ensure compliance with the tether constraint. In this proposed method, the tether constraint is directly embedded in the control design and therefore guarantees the TUAV remains within a predefined operational region defined by the maximum tether length while achieving precise trajectory tracking. The effectiveness of the proposed framework is validated through simulations involving set-point tracking, dynamic trajectory following, and disturbances such as incorrect user inputs. The results demonstrate that the TUAV respects the tether constraint ||x(t)||</= Lmax, with tracking errors converging to zero and the control input remaining bounded.",
+    "repository": "arXiv",
+    "archiveID": "arXiv:2502.08129",
+    "url": "https://arxiv.org/abs/2502.08129",
+    "DOI": "",
+    "arxiv": "2502.08129",
+    "source": "arxiv",
+    "tags": [
+      "notebooklm"
+    ],
+    "zotero_key": "RUSRV34Z"
+  }
+]

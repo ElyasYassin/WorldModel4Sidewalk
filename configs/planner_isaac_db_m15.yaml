@@ -1,0 +1,14 @@
+# E3d: deadband-aware MPC with a smaller clearance margin, run on the five E3b/E3c failure scenes only.
+# E3c failures all parked at 0.26-0.33 m clearance (= the 0.3 m margin) in gaps that can't be crossed while keeping it.
+_base_: planner_isaac_db.yaml
+mpc:
+  weights:
+    clearance_margin_m: 0.15
+navigation:
+  scenarios:
+    explicit:
+      - {seed: 10014, scene_id: obstacles_10014}
+      - {seed: 10002, scene_id: sidewalk_10002}
+      - {seed: 10004, scene_id: sidewalk_10004}
+      - {seed: 10008, scene_id: sidewalk_10008}
+      - {seed: 10011, scene_id: sidewalk_10011}

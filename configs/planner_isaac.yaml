@@ -1,0 +1,12 @@
+# Planner settings for the Isaac Go2 backend. Limits stay inside the pretrained
+# policy's trained command ranges (lin +-1 m/s, yaw +-1 rad/s; see docs/ISAAC_INTEGRATION.md).
+_base_: planner.yaml
+limits:
+  vx: [-0.3, 0.9]
+  vy: [-0.3, 0.3]
+  yaw_rate: [-1.0, 1.0]
+navigation:
+  scenarios:
+    families: [open, obstacles, sidewalk]   # no 'slippery' family in Isaac yet
+mpc:
+  device: cuda

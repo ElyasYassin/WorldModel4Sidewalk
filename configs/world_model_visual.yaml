@@ -1,0 +1,16 @@
+# Phase E (NOT IMPLEMENTED YET): frozen V-JEPA 2 encoder + action-conditioned latent predictor.
+# scripts/train.py refuses this config with an actionable message until Phase E lands.
+_base_: world_model_state.yaml
+visual:
+  encoder: facebook/vjepa2-vitl-fpc64-256   # candidate HF checkpoint; verify against facebookresearch/vjepa2 README
+  frames_per_clip: 16                       # must match the checkpoint's documented sampling recipe
+  frame_stride: 1
+  image_size: 256
+  cache_dir: cache/vjepa2                   # under data root; keyed by checkpoint hash + recipe version
+  freeze: true
+latent:
+  fusion_dim: 256
+  predictor: gru
+  lambda_latent: 1.0
+  lambda_state: 1.0
+  lambda_risk: 0.0                          # stays 0 until validated risk labels exist

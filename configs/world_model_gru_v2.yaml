@@ -1,0 +1,3 @@
+_base_: world_model_gru.yaml
+data:
+  manifest: v2

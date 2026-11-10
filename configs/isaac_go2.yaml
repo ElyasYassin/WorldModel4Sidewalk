@@ -1,0 +1,41 @@
+# Isaac Lab Go2 backend. Run anything using it via scripts\isaac_python.bat.
+backend: isaac
+isaac:
+  task: Isaac-Velocity-Flat-Unitree-Go2-Play-v0     # registered by isaaclab_tasks (verified in docs/INSTALL.md)
+  train_task: Isaac-Velocity-Flat-Unitree-Go2-v0    # name the published checkpoint is stored under
+  policy_checkpoint: pretrained                     # 'pretrained' = NVIDIA published rsl_rl checkpoint, or a path to model_*.pt
+  headless: true
+  enable_cameras: false
+  device: cuda:0
+  control_dt: 0.1             # high-level command period; held for control_dt / env.step_dt policy steps
+  settle_s: 1.0               # zero-command settling after each reset (not recorded)
+  robot_radius: 0.3           # footprint circle for geometric collision/clearance
+  fall_gravity_z: -0.5        # projected gravity z above this => fall (tilted > ~60 deg)
+  fall_min_height: 0.08       # base height [m] below this => fall (policy walks with base ~0.15-0.19 m at speed)
+  base_contact_threshold_n: 1.0   # as Isaac Lab's base_contact termination
+  # Scenes reuse the mock scene geometry (backend-neutral) with fixed-size cylinder obstacles.
+  families: [open, obstacles, sidewalk]
+  obstacle_slots: 8
+  obstacle_radius: 0.3
+  obstacle_height: 0.6
+  # Command clamp. Must stay inside the policy's trained ranges (lin_vel +-1, ang_vel +-1).
+  command_limits:
+    vx: [-1.0, 1.0]
+    vy: [-1.0, 1.0]
+    yaw_rate: [-1.0, 1.0]
+
+collect:
+  episodes: 20
+  max_steps: 300
+  base_seed: 0
+  goal_tolerance_m: 0.5
+  limits:
+    vx: [-0.4, 1.0]
+    vy: [-0.4, 0.4]
+    yaw_rate: [-1.0, 1.0]
+  exploration:
+    p_random: 0.45
+    p_goal: 0.45
+    p_stop: 0.10
+    hold_s: [0.5, 2.5]
+    smoothing: 0.5
