@@ -35,6 +35,7 @@ def compose_se2_torch(pose: torch.Tensor, delta: torch.Tensor) -> torch.Tensor:
 class DynamicsBase(nn.Module):
     model_type = "base"
     learned = True
+    uses_terrain = False
 
     def __init__(self, history: int, feat_dim: int = FEATURE_DIM, act_dim: int = ACTION_DIM, target_dim: int = TARGET_DIM):
         super().__init__()
@@ -54,10 +55,15 @@ class DynamicsBase(nn.Module):
         return {"history": self.history, "feat_dim": self.feat_dim, "act_dim": self.act_dim, "target_dim": self.target_dim}
 
     # --- to implement: normalized prediction -------------------------------
-    def _step_norm(self, hf: torch.Tensor, ha: torch.Tensor, hd: torch.Tensor, a: torch.Tensor, dt: torch.Tensor) -> torch.Tensor:
+    def _step_norm(self, hf: torch.Tensor, ha: torch.Tensor, hd: torch.Tensor, a: torch.Tensor, dt: torch.Tensor,
+                   extra: torch.Tensor | None = None) -> torch.Tensor:
         raise NotImplementedError
 
-    def step_normalized(self, hist_feat, hist_act, hist_dt, act, dt) -> torch.Tensor:
+    def _context(self, pose: torch.Tensor, terrain_map: torch.Tensor | None) -> torch.Tensor | None:
+        """Extra per-step input from the current predicted pose (terrain models); None otherwise."""
+        return None
+
+    def step_normalized(self, hist_feat, hist_act, hist_dt, act, dt, extra=None) -> torch.Tensor:
         """Returns normalized delta targets [B, T]."""
         return self._step_norm(
             self.feat_norm(hist_feat),
@@ -65,13 +71,15 @@ class DynamicsBase(nn.Module):
             self.dt_norm(hist_dt.unsqueeze(-1)),
             self.act_norm(act),
             self.dt_norm(dt.unsqueeze(-1)),
+            extra,
         )
 
     def step(self, hist_feat, hist_act, hist_dt, act, dt) -> torch.Tensor:
         """Physical-unit delta targets [B, T]."""
         return self.target_norm.inverse(self.step_normalized(hist_feat, hist_act, hist_dt, act, dt))
 
-    def rollout(self, hist_feat, hist_act, hist_dt, fut_act, fut_dt, return_normalized: bool = False) -> dict[str, torch.Tensor]:
+    def rollout(self, hist_feat, hist_act, hist_dt, fut_act, fut_dt, return_normalized: bool = False,
+                terrain_map: torch.Tensor | None = None) -> dict[str, torch.Tensor]:
         """Open-loop autoregressive rollout.
 
         hist_feat [B,K,F], hist_act [B,K,A], hist_dt [B,K], fut_act [B,H,A], fut_dt [B,H]
@@ -83,7 +91,7 @@ class DynamicsBase(nn.Module):
         hf, ha, hd = hist_feat, hist_act, hist_dt
         for h in range(H):
             a, dt = fut_act[:, h], fut_dt[:, h]
-            dn = self.step_normalized(hf, ha, hd, a, dt)
+            dn = self.step_normalized(hf, ha, hd, a, dt, self._context(pose, terrain_map))
             d = self.target_norm.inverse(dn)
             new_feat = hf[:, -1] + d[:, FEAT0:]
             pose = compose_se2_torch(pose, d[:, [DX, DY, DYAW]])
@@ -124,9 +132,9 @@ class MLPDynamics(DynamicsBase):
     def kwargs(self):
         return {**super().kwargs(), "hidden": self.hidden, "layers": self.layers}
 
-    def _step_norm(self, hf, ha, hd, a, dt):
-        x = torch.cat([hf.flatten(1), ha.flatten(1), hd.flatten(1), a, dt], dim=-1)
-        return self.net(x)
+    def _step_norm(self, hf, ha, hd, a, dt, extra=None):
+        parts = [hf.flatten(1), ha.flatten(1), hd.flatten(1), a, dt] + ([extra] if extra is not None else [])
+        return self.net(torch.cat(parts, dim=-1))
 
 
 class GRUDynamics(DynamicsBase):
@@ -141,7 +149,7 @@ class GRUDynamics(DynamicsBase):
     def kwargs(self):
         return {**super().kwargs(), "hidden": self.hidden, "layers": self.layers}
 
-    def _step_norm(self, hf, ha, hd, a, dt):
+    def _step_norm(self, hf, ha, hd, a, dt, extra=None):
         _, h = self.gru(torch.cat([hf, ha, hd], dim=-1))
         return self.head(torch.cat([h[-1], a, dt], dim=-1))
 
@@ -187,11 +195,33 @@ class KinematicBaseline(DynamicsBase):
         d[:, FEAT0:] = new_feat - last
         return d
 
-    def step_normalized(self, *args):
-        return self.target_norm(self.step(*args))
+    def step_normalized(self, hist_feat, hist_act, hist_dt, act, dt, extra=None):
+        return self.target_norm(self.step(hist_feat, hist_act, hist_dt, act, dt))
 
 
-MODEL_TYPES = {"mlp": MLPDynamics, "gru": GRUDynamics}
+class TerrainMLPDynamics(MLPDynamics):
+    """MLP + local terrain patch sampled at each predicted pose from the start-frame height map."""
+
+    model_type = "terrain_mlp"
+    uses_terrain = True
+
+    def __init__(self, history: int, hidden: int = 256, layers: int = 3, **kw):
+        from .terrain_map import PATCH_DIM
+
+        super().__init__(history, hidden, layers, **kw)
+        self.patch_dim = PATCH_DIM
+        d_in = history * (self.feat_dim + self.act_dim + 1) + self.act_dim + 1 + PATCH_DIM
+        self.net[0] = nn.Linear(d_in, hidden)
+
+    def _context(self, pose, terrain_map):
+        from .terrain_map import sample_patch
+
+        if terrain_map is None:
+            return torch.zeros(pose.shape[0], self.patch_dim, device=pose.device, dtype=pose.dtype)
+        return sample_patch(terrain_map, pose)
+
+
+MODEL_TYPES = {"mlp": MLPDynamics, "gru": GRUDynamics, "terrain_mlp": TerrainMLPDynamics}
 
 
 def build_model(cfg: dict[str, Any]) -> DynamicsBase:

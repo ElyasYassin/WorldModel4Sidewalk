@@ -78,12 +78,14 @@ def main(argv=None) -> int:
         parts = [f"{h}s {c['mean_diff_m']:+.3f} [{c['diff_ci95_over_episodes'][0]:+.3f},{c['diff_ci95_over_episodes'][1]:+.3f}]"
                  f" ep {c['episodes_ref_better']}/{c['n_episodes']}" for h, c in cmp.items()]
         print(f"[paired] {other} - {pc['reference']} pos err: " + "; ".join(parts))
-    for pt, pc in (res.get("paired_by_pattern") or {}).items():
-        line = []
-        for other, cmp in pc.get("comparisons", {}).items():
-            c = cmp.get("1.0") or next(iter(cmp.values()))
-            line.append(f"{other} {c['mean_diff_m']:+.3f} [{c['diff_ci95_over_episodes'][0]:+.3f},{c['diff_ci95_over_episodes'][1]:+.3f}]")
-        print(f"[pattern {pt}] @1s, other - {pc['reference']}: " + "; ".join(line))
+    for gname in ("pattern", "segment"):
+        for pt, pc in (res.get(f"paired_by_{gname}") or {}).items():
+            line = []
+            for other, cmp in pc.get("comparisons", {}).items():
+                c = cmp.get("1.0") or next(iter(cmp.values()))
+                line.append(f"{other} {c['mean_diff_m']:+.3f} [{c['diff_ci95_over_episodes'][0]:+.3f},{c['diff_ci95_over_episodes'][1]:+.3f}]")
+            n = next(iter(res["models"].values()))["open_loop"].get("1.0", {}).get(f"by_{gname}", {}).get(pt, {}).get("n_windows", "?")
+            print(f"[{gname} {pt}, {n} windows] @1s, other - {pc['reference']}: " + "; ".join(line))
     print(f"[eval] wrote {out / 'prediction_metrics.json'} and plots")
     return 0
 

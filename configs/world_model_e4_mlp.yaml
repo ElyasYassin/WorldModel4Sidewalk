@@ -1,0 +1,10 @@
+# E4 (terrain) dynamics: same model/training as world_model_state.yaml, on data/go2_e4_train.
+# Train/val/dev-test split is by episode within the 12 training tiles; the untouched final test is
+# data/go2_e4_test (6 unseen tiles). Compare: e4_mlp, e4_gru (state only), e4_terrain (+ height map).
+_base_: world_model_state.yaml
+data:
+  manifest: e4
+model:
+  type: mlp
+  hidden: 256
+  layers: 3

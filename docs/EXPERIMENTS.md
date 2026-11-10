@@ -304,6 +304,135 @@ lateral commands. It stands still for small planar commands, including all turn-
   truth, log contacts at physics rate (or the contact sensor's air/contact time) and check with the rough policy.
 - `ground_z_m` is NaN without a height scanner (by design); the rough policy provides one.
 
+## E1r: velocity tracking, pretrained rough-terrain policy (2026-11-10)
+
+- Checkpoint `.pretrained_checkpoints/rsl_rl/Isaac-Velocity-Rough-Unitree-Go2-v0/checkpoint.pt` (NVIDIA, 6.9 MB), flat
+  sidewalk tile, `scripts/isaac_smoke.py --config configs/isaac_go2_rough.yaml` → `outputs/isaac_smoke_rough/report.json`.
+  No fall; pass.
+
+| command (vx, vy, wz) | flat policy (E1) realized | rough policy realized |
+|---|---|---|
+| 0.5, 0, 0 | 0.49, 0.00, 0.01 | 0.46, 0.02, 0.05 |
+| 1.0, 0, 0 | 1.02, 0.02, −0.02 | 0.99, −0.07, 0.06 |
+| 0.5, 0, 0.5 | 0.48, 0.01, 0.46 | 0.46, −0.01, 0.54 |
+| 0, 0.3, 0 | −0.01, 0.00, −0.03 (**dead zone**) | 0.02, 0.27, 0.01 |
+| 0, ±0.6, 0 | ±0.61 | 0.57 / −0.55 |
+| 0, 0, −0.8 / 0.5 / 1.0 | 0 / 0.03 / 0 (**no turn in place**) | −0.51 / 0.19 / 0.31 (partial) |
+| 0.3, 0, 0.8 | 0.18, 0.04, 0.41 | 0.15, −0.01, 0.66 |
+
+- The rough policy has a much smaller dead zone: it tracks 0.3 m/s lateral and turns in place, although only at 40–60 % of
+  the commanded rate. Navigation results tuned around the flat policy's dead zone (E3c deadband, conventional `min_speed`)
+  need re-checking with this policy.
+
+## E4-S1: traversal smoke test, rough policy (2026-11-10)
+
+- `scripts/isaac_terrain_smoke.py --config configs/isaac_go2_rough_e4s1.yaml`: lane-following along the centreline at
+  0.4/0.6/0.8 m/s, 2 episodes each → `data/go2_e4_smoke`, `outputs/e4_smoke/report.json`.
+- **6/6 reached the end, 0 falls** (33, 20, 15 s at 0.4/0.6/0.8 m/s). The policy can traverse S1, so S1 failures in later
+  experiments are not locomotion limits.
+- Mean forward-speed error by section: flat −0.03 to −0.04 m/s; 8 cm slab −0.02 to −0.12 (largest at 0.4 m/s); 6 % grade
+  −0.00 to −0.02. Mean foot slip 0.04–0.08 m/s, highest on the slab. Per-foot contact fraction 0.56–0.66, a normal gait, so
+  the E4-preflight contact anomaly was the flat policy's gait, not a logging bug (contacts are still sampled at 10 Hz).
+- Height scanner works: scanner ground height is finite at every step and equals the analytic surface minus a constant
+  0.036 m (std 0.006 m). The constant is the env-origin z (Isaac puts the origin at the highest point within 1 m of the tile
+  centre); `gt_ground_z_m` is relative to the env origin, `sidewalk_height` to the start surface. Height above ground
+  dips to 0.20 m at the slab edge at 0.4 m/s (scanner rays reach the slab top before the base): a measurement artefact
+  near steps, not a fall; use it with care for fall detection near steps.
+- Not tested: the curb (lane-following keeps y in 0–0.4 m, the curb is at y = −1.5 m) and cross-slope drift (closed loop
+  corrects it).
+- **Finding:** S1 is easy for this policy; terrain changes realized speed by at most ≈0.1 m/s. Command kinematics will
+  likely be nearly as good as a learned model here, so S1 alone cannot show a benefit from prediction. Next: sweep
+  slab height, friction, cross-slope and curb approach to find where the policy's realized motion departs from the command.
+
+## E4 sweep: one terrain feature at a time, rough policy (2026-11-10)
+
+- `configs/e4_sweep.yaml`, `scripts/e4_sweep_queue.ps1` (one Isaac process per variant), analysis
+  `python scripts/analyze_terrain_sweep.py` → `outputs/e4_sweep/analysis.json`; data `data/go2_e4_sweep` (seeds 60000+).
+  Probes: lane-following at 0.4 and 0.8 m/s, a 20 s open-loop straight command at 0.6 m/s; curb variants cross down to
+  the road and back up. **One episode per cell.**
+- First pass: 15 of 18 variants (queue stopped for low system memory); `friction_025`, `friction_015`, `curb_25` and
+  3-per-speed repeats of the 15 cm slab, 30 % grade and 15 cm curb ran in a second pass. `curb_15_rep` was stopped (low
+  memory) after 1 of 9 episodes.
+- `kin1s` = command-kinematics 1 s position error on the feature (plain-ground reference ≈ 0.03–0.06 m):
+
+| feature | 0.4 m/s lane | 0.8 m/s lane | 0.6 m/s straight | kin1s on feature (0.4 / 0.8 / straight) |
+|---|---|---|---|---|
+| flat | goal | goal | – | 0.052 / 0.041 / 0.003 |
+| slab 5 cm | goal (hesitates, vx −0.21) | goal | ok | 0.219 / 0.037 / 0.025 |
+| slab 10 cm | goal | goal | ok | 0.138 / 0.089 / 0.072 |
+| slab 15 cm | **stuck at x = 4.0** | goal (1 of 4 runs, see repeats) | **stuck** | 0.384 / 0.193 / 0.539 |
+| slab 20 cm | **stuck** | **stuck** | **stuck** | 0.384 / 0.758 / 0.540 |
+| slab 25 cm | **stuck** | **stuck** | **stuck** | 0.377 / 0.759 / 0.544 |
+| grade 15 % | goal | goal | ok | 0.030 / 0.017 / 0.033 |
+| grade 30 % | **stuck at x = 5.4** | goal | ok | 0.339 / 0.105 / 0.042 |
+| cross-slope 6–20 % | goal | goal | drifts downhill | 0.024–0.076 |
+| friction 0.6, 0.4 | goal | goal | ok | 0.002–0.050 |
+| curb 15 cm, down + up | **stuck on the step up** | down and up | – | 0.249 / 0.062 |
+
+- No falls anywhere: every failure is the robot stopping in front of a step or on the steep grade while still commanded
+  forward ("stuck", < 0.1 m in the last 10 s).
+- **Repeats (3 per speed) correct the single-run picture:**
+  - 30 % grade is speed-dependent and repeatable: 0.4 m/s stuck 4/4, 0.6 m/s pass 3/3, 0.8 m/s pass 4/4.
+  - 15 cm slab is **not** speed-dependent; it is a stochastic limit: pass 1/4 at 0.4, 2/3 at 0.6, 1/4 at 0.8 m/s, plus one
+    **fall** at 0.8 m/s (the only fall in the sweep). The first-pass "passes at 0.8" was one lucky run.
+  - 15 cm curb step-up: stuck in 1 of 2 runs at 0.4 m/s (repeats stopped after one episode). 25 cm curb: 0.4 m/s stalls
+    on the step up (x 8.7 m at timeout); 0.8 m/s gets up but slowly (vx −0.34 m/s on the feature, kin1s 0.36 m).
+  - ≥ 20 cm slabs fail at every speed, although the policy was trained on steps up to 23 cm (pyramid stairs, not a single
+    raised slab).
+- Cross-slope: closed-loop traversal unaffected, but the open-loop straight run turns downhill: −13° to −28° heading over
+  ≈ 11 m, against +16° on flat ground (the policy itself has a small yaw bias), so a 30–44° downhill effect at 20 %. Slow
+  drift barely shows at 1 s (kin1s ≈ flat) but will at 3 s.
+- Friction: 0.6 and 0.4 (× foot 0.8/0.6) change nothing measurable. 0.25: still passes, foot slip doubles (0.28 m/s
+  at 0.4 m/s), kin1s 0.11 m. 0.15: the 0.4 m/s run only reaches x = 9 m in 40 s (slip 0.36 m/s, kin1s 0.17 m); 0.8 m/s
+  passes.
+- **Finding:** command kinematics is as good as on flat ground everywhere except near step-ups and steep grades, where it
+  is 3–15× worse (up to 0.76 m at 1 s) because it predicts motion that does not happen. That is a planning-relevant error:
+  whether a step can be taken decides success. On grades the outcome is a repeatable function of speed, which a
+  deterministic terrain-aware model can learn. Near the step limit (15 cm) the outcome is stochastic, so a useful model
+  there must predict a *probability* of stalling, not one trajectory. Very low friction (≤ 0.25) is a third regime.
+  E4 data collection targets steps of 3–18 cm, curbs and grades up to 25 % at 0.3–0.9 m/s.
+- Caveats: 1 episode per cell outside the repeated cells; the height-above-ground signal dips at step edges (E4-S1).
+
+## E4-P2: does terrain input improve prediction? (2026-11-10)
+
+- **Data.** 144 train episodes on 12 random sidewalk tiles (`configs/e4_tiles.yaml`, seeds 70000+, `data/go2_e4_train`,
+  manifest `e4`: 100/22/22 train/val/dev-test by episode) and 48 final-test episodes on 6 unseen tiles (seeds 80000+,
+  `data/go2_e4_test`, manifest `all_test`). Rough policy, 30 s max, commands: 53 % lane-following at 0.3–0.9 m/s, rest
+  exploration. Outcomes (train / test): goal 50/13, timeout 65/21, out of bounds 23/11, fall 6/3. Validator passes.
+- **Models.** MLP 256×3 and GRU 128×1 (state + commands only); terrain MLP = the same MLP plus a 16-d height patch
+  sampled at every predicted pose from a perfect start-frame elevation map (`src/go2wm/models/terrain_map.py`). 40 epochs,
+  seeds 0/1/2 each (`--seed`), no tuning on any test split. Final test run once with all 9 checkpoints.
+- **Results, position error (m), mean ± sd over 3 seeds.** (`outputs/e4_p2/{devtest,final_test}/prediction_metrics.json`)
+
+| split | model | 0.5 s | 1 s | 2 s | 3 s |
+|---|---|---|---|---|---|
+| dev-test (seen tiles) | terrain MLP | 0.022 | **0.044** | **0.086** | **0.133** ± 0.005 |
+| | MLP | 0.023 | 0.050 | 0.107 | 0.169 ± 0.003 |
+| | GRU | 0.022 | 0.047 | 0.098 | 0.155 ± 0.004 |
+| | kinematics | 0.066 | 0.127 | 0.244 | 0.366 |
+| final test (unseen tiles) | terrain MLP | 0.025 | 0.051 | 0.108 | 0.181 ± 0.004 |
+| | MLP | 0.024 | 0.052 | 0.117 | 0.195 ± 0.005 |
+| | GRU | 0.023 | 0.050 | 0.112 | 0.184 ± 0.003 |
+| | kinematics | 0.070 | 0.135 | 0.265 | 0.399 |
+
+- Final test by segment, seed-mean error at 2 s (mean / p90): step (2677 windows) terrain 0.158/0.348, MLP 0.184/0.476,
+  GRU 0.180/0.478, kinematics 0.209/0.477; grade (712) 0.115 / 0.126 / 0.115 / 0.162; curb (161) 0.131 / 0.131 / 0.109 /
+  0.150; plain (6579) 0.086 / 0.088 / 0.084 / 0.302.
+- **Findings.**
+  - Every learned model beats command kinematics by 2.5–2.7× at 1 s on unseen tiles (paired, 45/48 episodes).
+  - The terrain input helps the MLP at 2–3 s (paired vs MLP at 2 s: +0.012 to +0.016 m, CIs exclude 0, 35–38/48
+    episodes), and the gain is concentrated on step segments, where it also cuts the p90 error by about a quarter.
+  - On unseen tiles the terrain MLP is tied with the state-only GRU overall (0.181 vs 0.184 at 3 s; paired CIs include 0)
+    and is no better on curbs and grades. Its seen-tile advantage (0.133 vs 0.155) shrinks on unseen tiles: it overfits
+    (train loss 0.126 vs 0.149 for the MLP at equal val loss).
+  - So: terrain information is useful, but the effect is modest (1–3 cm at 2–3 s) and limited to steps; the stochastic
+    stall-or-climb outcome at 15–18 cm steps is not resolved by a deterministic model.
+- **Caveats.** Segment labels use the true future path, so windows where the robot stalls in front of a step are labelled
+  plain (this is why kinematics has a p90 of 1.1 m on plain). Perfect elevation map, not the robot's scanner. Prediction
+  quality only; decision utility (navigation with these models) is not tested here.
+- **Next.** Terrain GRU (recurrence + terrain), stronger regularisation, a probabilistic head for step outcomes, labels
+  from the commanded path; then a navigation test on sidewalk tiles to see if the prediction gain changes decisions.
+
 ## Next experiments (Isaac)
 - P1: sidewalk terrain with the rough-terrain policy (`configs/isaac_go2_rough_e4s1.yaml`, `scripts/isaac_terrain_smoke.py`);
   needs the pretrained rough checkpoint.

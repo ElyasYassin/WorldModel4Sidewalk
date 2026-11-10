@@ -72,16 +72,44 @@ def sidewalk_heightfield(size: tuple[float, float], horizontal_scale: float, ver
     return np.round(z / vertical_scale).astype(np.int16)
 
 
-def make_isaac_terrain_generator(p: dict[str, Any]):
-    """TerrainGeneratorCfg with one sidewalk tile. Import only after the Isaac app is running."""
-    from dataclasses import MISSING  # noqa: F401
+def random_sidewalk_tile(rng: np.random.Generator, slab_max: float = 0.18, grade_max: float = 0.25,
+                         cross_max: float = 0.12, curb_max: float = 0.20) -> dict[str, Any]:
+    """One randomized sidewalk tile for data collection (features away from the start, x in [2, 11])."""
+    p: dict[str, Any] = {"width": float(rng.uniform(2.5, 3.5)),
+                         "cross_slope": float(rng.choice([-1, 1]) * rng.uniform(0, cross_max))}
+    slabs, x = [], 2.0
+    for _ in range(int(rng.integers(0, 3))):
+        x0 = float(rng.uniform(x, x + 2.5))
+        L = float(rng.uniform(0.8, 2.0))
+        if x0 + L > 11.0:
+            break
+        slabs.append([round(x0, 2), round(L, 2), round(float(rng.uniform(0.03, slab_max)), 3)])
+        x = x0 + L + 0.5
+    p["slabs"] = slabs
+    if rng.uniform() < 0.6:
+        x0 = float(rng.uniform(x if x < 8 else 2.0, 9.0))
+        x1 = min(x0 + float(rng.uniform(1.5, 4.0)), 12.0)
+        p["grade"] = [[round(x0, 2), round(x1, 2), round(float(rng.choice([-1, 1]) * rng.uniform(0.03, grade_max)), 3)]]
+    else:
+        p["grade"] = []
+    p["curb_drop"] = round(float(rng.uniform(0.08, curb_max)), 3) if rng.uniform() < 0.6 else 0.0
+    return p
 
+
+def make_isaac_terrain_generator(p: dict[str, Any] | list[dict[str, Any]]):
+    """TerrainGeneratorCfg with one sidewalk tile, or one column per tile for a list of tiles
+    (curriculum layout with equal proportions puts tile i in column i). Import only after the
+    Isaac app is running."""
     from isaaclab.terrains import TerrainGeneratorCfg
     from isaaclab.terrains.height_field.hf_terrains_cfg import HfTerrainBaseCfg
     from isaaclab.terrains.height_field.utils import height_field_to_mesh
     from isaaclab.utils import configclass
 
-    p = params_with_defaults(p)
+    tiles = [params_with_defaults(t) for t in (p if isinstance(p, list) else [p])]
+    size = tuple(tiles[0]["size"])
+    hs, vs = tiles[0]["horizontal_scale"], tiles[0]["vertical_scale"]
+    if any(tuple(t["size"]) != size or t["horizontal_scale"] != hs or t["vertical_scale"] != vs for t in tiles):
+        raise ValueError("all terrain tiles must share size and grid scales")
 
     @height_field_to_mesh
     def _sidewalk(difficulty: float, cfg) -> np.ndarray:  # difficulty unused: geometry is fixed
@@ -92,10 +120,11 @@ def make_isaac_terrain_generator(p: dict[str, Any]):
         function = _sidewalk
         params: dict = {}
 
-    tile = SidewalkHfCfg(proportion=1.0, params=p, horizontal_scale=p["horizontal_scale"],
-                         vertical_scale=p["vertical_scale"], border_width=0.0, slope_threshold=0.75)
+    subs = {f"sidewalk_{i:03d}": SidewalkHfCfg(proportion=1.0, params=t, horizontal_scale=hs, vertical_scale=vs,
+                                              border_width=0.0, slope_threshold=0.75)
+            for i, t in enumerate(tiles)}
     return TerrainGeneratorCfg(
-        size=tuple(p["size"]), border_width=5.0, num_rows=1, num_cols=1,
-        horizontal_scale=p["horizontal_scale"], vertical_scale=p["vertical_scale"], slope_threshold=0.75,
-        curriculum=False, use_cache=False, sub_terrains={"sidewalk": tile},
+        size=size, border_width=5.0, num_rows=1, num_cols=len(tiles),
+        horizontal_scale=hs, vertical_scale=vs, slope_threshold=0.75,
+        curriculum=len(tiles) > 1, use_cache=False, sub_terrains=subs,
     )

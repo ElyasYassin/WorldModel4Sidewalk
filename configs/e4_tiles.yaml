@@ -1,0 +1,129 @@
+# FROZEN E4 tile sets, written by scripts/make_terrain_tiles.py (train seed 1, test seed 2).
+# Tile params are sidewalk_height() inputs (src/go2wm/sim/terrain.py); seed s runs on tile s % n.
+train:
+- width: 3.0118216247002567
+  cross_slope: 0.017299153526356047
+  slabs:
+  - [4.37, 1.17, 0.093]
+  - [8.12, 1.29, 0.112]
+  grade:
+  - [7.27, 10.12, 0.203]
+  curb_drop: 0.134
+- width: 2.8318723918681004
+  cross_slope: -0.06091591918708999
+  slabs:
+  - [2.39, 1.76, 0.033]
+  grade:
+  - [6.56, 10.44, 0.093]
+  curb_drop: 0.105
+- width: 2.948415143332272
+  cross_slope: 0.05039989552706306
+  slabs:
+  - [2.69, 1.79, 0.037]
+  grade:
+  - [8.5, 11.65, 0.144]
+  curb_drop: 0.0
+- width: 2.5140686387769664
+  cross_slope: 0.0547145530688851
+  slabs: []
+  grade: []
+  curb_drop: 0.0
+- width: 2.8948251543574663
+  cross_slope: -0.1106831757063678
+  slabs:
+  - [3.3, 1.8, 0.179]
+  - [5.94, 1.41, 0.03]
+  grade:
+  - [8.18, 11.21, -0.034]
+  curb_drop: 0.134
+- width: 2.8852547981835803
+  cross_slope: -0.10433734896683276
+  slabs:
+  - [2.97, 1.48, 0.038]
+  - [6.1, 1.84, 0.168]
+  grade: []
+  curb_drop: 0.0
+- width: 2.6441256750198456
+  cross_slope: 0.09681719465214961
+  slabs:
+  - [4.23, 1.98, 0.034]
+  - [7.34, 1.1, 0.045]
+  grade:
+  - [5.96, 9.18, -0.036]
+  curb_drop: 0.172
+- width: 2.8596767659247475
+  cross_slope: 0.0773737519762058
+  slabs:
+  - [2.86, 1.85, 0.07]
+  grade:
+  - [5.88, 9.41, -0.189]
+  curb_drop: 0.0
+- width: 3.0382985891889107
+  cross_slope: 0.0814474245430401
+  slabs:
+  - [2.93, 1.66, 0.147]
+  - [7.4, 1.85, 0.14]
+  grade:
+  - [5.85, 9.8, 0.114]
+  curb_drop: 0.0
+- width: 3.179801849247138
+  cross_slope: 0.04420995971828545
+  slabs:
+  - [3.07, 0.97, 0.174]
+  grade: []
+  curb_drop: 0.0
+- width: 3.295931315328474
+  cross_slope: -0.04023014834209829
+  slabs: []
+  grade:
+  - [5.51, 7.75, 0.1]
+  curb_drop: 0.191
+- width: 2.556779024867949
+  cross_slope: 0.08544569034967583
+  slabs:
+  - [3.61, 1.55, 0.077]
+  grade: []
+  curb_drop: 0.159
+test:
+- width: 2.7616121342493165
+  cross_slope: -0.09770708887131363
+  slabs: []
+  grade:
+  - [6.2, 9.52, 0.042]
+  curb_drop: 0.159
+- width: 3.394637508620263
+  cross_slope: -0.024661839207704695
+  slabs:
+  - [4.41, 0.85, 0.101]
+  - [5.89, 1.65, 0.046]
+  grade:
+  - [8.46, 10.73, 0.192]
+  curb_drop: 0.0
+- width: 3.350634687232882
+  cross_slope: -0.04565855855160496
+  slabs:
+  - [3.56, 1.62, 0.117]
+  - [6.36, 1.44, 0.118]
+  grade:
+  - [8.6, 10.7, -0.245]
+  curb_drop: 0.0
+- width: 2.851446920295525
+  cross_slope: -0.06461787797343899
+  slabs:
+  - [2.42, 0.88, 0.118]
+  grade: []
+  curb_drop: 0.0
+- width: 3.016871443212356
+  cross_slope: -0.03945424785052194
+  slabs:
+  - [4.37, 1.51, 0.123]
+  grade: []
+  curb_drop: 0.182
+- width: 3.3205848747771505
+  cross_slope: -0.06167651520843542
+  slabs:
+  - [4.05, 1.97, 0.061]
+  - [8.66, 1.92, 0.125]
+  grade:
+  - [5.62, 7.57, 0.248]
+  curb_drop: 0.087

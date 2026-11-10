@@ -25,11 +25,15 @@ def pick_device(name: str = "auto") -> torch.device:
 
 
 def to_tensors(w: WindowArrays, device: torch.device) -> dict[str, torch.Tensor]:
-    return {k: torch.as_tensor(getattr(w, k), device=device) for k in BATCH_KEYS}
+    out = {k: torch.as_tensor(getattr(w, k), device=device) for k in BATCH_KEYS}
+    if w.terrain_map is not None:
+        out["terrain_map"] = torch.as_tensor(w.terrain_map, device=device)
+    return out
 
 
 def batch_loss(model: DynamicsBase, b: dict[str, torch.Tensor], rollout_weight: float, huber_delta: float) -> torch.Tensor:
-    out = model.rollout(b["hist_feat"], b["hist_act"], b["hist_dt"], b["fut_act"], b["fut_dt"], return_normalized=True)
+    out = model.rollout(b["hist_feat"], b["hist_act"], b["hist_dt"], b["fut_act"], b["fut_dt"], return_normalized=True,
+                        terrain_map=b.get("terrain_map"))
     return rollout_loss(out["deltas_norm"], model.target_norm(b["targets"]), rollout_weight, huber_delta)
 
 
@@ -42,7 +46,7 @@ def evaluate_loss(model, data: dict[str, torch.Tensor], tc: dict[str, Any], bs: 
         b = {k: v[i : i + bs] for k, v in data.items()}
         m = len(b["hist_feat"])
         tot += batch_loss(model, b, tc["rollout_weight"], tc["huber_delta"]).item() * m
-        out = model.rollout(b["hist_feat"], b["hist_act"], b["hist_dt"], b["fut_act"], b["fut_dt"])
+        out = model.rollout(b["hist_feat"], b["hist_act"], b["hist_dt"], b["fut_act"], b["fut_dt"], terrain_map=b.get("terrain_map"))
         pos_err += (out["poses"][:, -1, :2] - b["fut_pose"][:, -1, :2]).norm(dim=-1).sum().item()
     return {"loss": tot / n, "final_pos_err_m": pos_err / n}
 
@@ -58,8 +62,9 @@ def train(cfg: dict[str, Any], data_root: str | Path, out_dir: str | Path, log: 
     train_eps = load_split(data_root, "train", dc.get("manifest", "default"), **mkw)
     val_eps = load_split(data_root, "val", dc.get("manifest", "default"), **mkw)
     K, H = dc["history"], dc["horizon_train"]
-    w_tr = build_windows(train_eps, K, H, dc.get("stride", 1))
-    w_va = build_windows(val_eps, K, H, dc.get("stride", 1))
+    tmap = cfg["model"]["type"] == "terrain_mlp"
+    w_tr = build_windows(train_eps, K, H, dc.get("stride", 1), terrain_map=tmap)
+    w_va = build_windows(val_eps, K, H, dc.get("stride", 1), terrain_map=tmap)
     log(f"[train] device={device} train: {len(train_eps)} eps / {len(w_tr)} windows, val: {len(val_eps)} eps / {len(w_va)} windows")
 
     model = build_model(cfg)

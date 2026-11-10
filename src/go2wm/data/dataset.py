@@ -107,15 +107,19 @@ class WindowArrays:
     fut_feat: np.ndarray  # [N, H, F]
     episode_index: np.ndarray  # [N]
     start_index: np.ndarray  # [N]
+    terrain_map: np.ndarray | None = None  # [N, NY, NX] start-frame height map (terrain models only)
 
     def __len__(self) -> int:
         return len(self.hist_feat)
 
 
-def build_windows(episodes: list[Episode], history: int, horizon: int, stride: int = 1) -> WindowArrays:
-    """Windows never cross episode boundaries; history needs K prior transitions."""
+def build_windows(episodes: list[Episode], history: int, horizon: int, stride: int = 1,
+                  terrain_map: bool = False) -> WindowArrays:
+    """Windows never cross episode boundaries; history needs K prior transitions.
+    terrain_map=True adds a start-frame height map per window (zeros on flat ground)."""
     K, H = history, horizon
-    out: dict[str, list] = {k: [] for k in WindowArrays.__dataclass_fields__}
+    out: dict[str, list] = {k: [] for k in WindowArrays.__dataclass_fields__ if k != "terrain_map"}
+    maps: list[np.ndarray] = []
     for ei, ep in enumerate(episodes):
         S = ep["states"]
         C = ep["commands"][:, :ACTION_DIM]
@@ -135,9 +139,18 @@ def build_windows(episodes: list[Episode], history: int, horizon: int, stride: i
             out["fut_feat"].append(feat[i + 1 : i + H + 1])
             out["episode_index"].append(ei)
             out["start_index"].append(i)
+        if terrain_map:
+            from ..models.terrain_map import episode_height_fn, start_maps
+
+            idx = np.arange(K, T - H + 1, stride)
+            if len(idx):
+                maps.append(start_maps(pose[idx], episode_height_fn(ep.meta)))
     if not out["hist_feat"]:
         raise ValueError(f"no windows (history={K}, horizon={H}); episodes too short?")
-    return WindowArrays(**{k: np.asarray(v, dtype=np.float32 if k not in ("episode_index", "start_index") else np.int64) for k, v in out.items()})
+    w = WindowArrays(**{k: np.asarray(v, dtype=np.float32 if k not in ("episode_index", "start_index") else np.int64) for k, v in out.items()})
+    if terrain_map:
+        w.terrain_map = np.concatenate(maps).astype(np.float32)
+    return w
 
 
 def load_split(root: str | Path, split: str, manifest_name: str = "default", **manifest_kw) -> list[Episode]:

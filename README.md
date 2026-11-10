@@ -10,12 +10,12 @@ and an existing pretrained locomotion policy turns those commands into gait.
 
 | piece | state |
 |---|---|
-| Mock and Isaac pipelines: collect → validate → train → evaluate → navigate | working; 36 tests pass (mock) |
+| Mock and Isaac pipelines: collect → validate → train → evaluate → navigate | working; 39 tests pass (mock) |
 | Isaac Lab Go2 adapter (pretrained flat-terrain policy, cylinder obstacles, flat ground) | working: [docs/ISAAC_INTEGRATION.md](docs/ISAAC_INTEGRATION.md) |
 | State-only dynamics (MLP, GRU) vs command kinematics | evaluated on Isaac data (E2, E2b): learned predicts better |
 | A* global planner, CEM local MPC, reactive baseline, safety filter | evaluated in Isaac on 51 dev + 51 final scenes (E3a–E3f): learned MPC ≈0.6 s faster than kinematic MPC, no success advantage; tuned conventional ties both |
 | Evaluation integrity | split audit, frozen protocol, final-test guard, fresh final tests (P0 done) |
-| Sidewalk terrain (E4) | code written (`src/go2wm/sim/terrain.py`); tile verified in Isaac with the flat policy; E4 needs the rough-terrain policy checkpoint |
+| Sidewalk terrain (E4) | parametric sidewalk tile + rough-terrain policy working; S1 traversed 6/6 (E4-S1); terrain sweep next |
 | Cameras, terrain-aware or V-JEPA 2 models | not implemented |
 | Scene graph, inspection modes, voice/mission manager | not implemented |
 | Real Go2 | read-only telemetry plan only: [docs/HARDWARE_HANDOFF.md](docs/HARDWARE_HANDOFF.md) |

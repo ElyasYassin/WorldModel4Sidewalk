@@ -1,6 +1,7 @@
 """Parametric sidewalk terrain (pure numpy part) and terrain ground-truth recording."""
 
 import numpy as np
+import pytest
 
 from go2wm.common.schema import VelocityCommand
 from go2wm.data.episodes import ARRAY_SPEC
@@ -56,3 +57,65 @@ def test_recorder_stores_declared_terrain_truth_only():
     assert ep.arrays["gt_height_above_ground_m"].shape == (6,)
     assert "gt_pose2d" not in ep.arrays  # mock's pose2d is not a declared array
     assert all(k in ARRAY_SPEC for k in ep.arrays)
+
+
+def test_sweep_kinematic_error_and_feature_mask():
+    import importlib.util
+    from pathlib import Path
+
+    spec = importlib.util.spec_from_file_location("ats", Path(__file__).parents[1] / "scripts" / "analyze_terrain_sweep.py")
+    ats = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(ats)
+    # robot that follows a constant arc command exactly -> zero kinematic error
+    dt, T = 0.1, 30
+    cmds = np.tile([0.6, 0.0, 0.3, dt], (T, 1))
+    pose = np.zeros((T + 1, 3))
+    for t in range(T):
+        x, y, th = pose[t]
+        pose[t + 1] = [x + 0.6 * np.cos(th) * dt, y + 0.6 * np.sin(th) * dt, th + 0.3 * dt]
+    assert np.allclose(ats.kin_errors(pose, cmds, dt), 0.0, atol=1e-9)
+    # robot that stands still while commanded 0.5 m/s -> 0.5 m error after 1 s
+    still = np.zeros((T + 1, 3))
+    assert np.allclose(ats.kin_errors(still, np.tile([0.5, 0, 0, dt], (T, 1)), dt), 0.5)
+    # slab feature mask covers the slab +-0.5 m only; curb mask the walkway edge
+    xy = np.array([[2.0, 0.0], [3.6, 0.0], [5.0, 0.0], [6.1, 0.0], [3.0, -1.4]])
+    assert ats.feature_mask(xy, {"slabs": [[4.0, 1.5, 0.1]]}).tolist() == [False, True, True, False, False]
+    assert ats.feature_mask(xy, {"curb_drop": 0.15, "width": 3.0}).tolist() == [False, False, False, False, True]
+
+
+def test_terrain_map_and_patch():
+    import torch
+
+    from go2wm.models.terrain_map import MAP_X, MAP_Y, PATCH_DIM, sample_patch, start_maps
+    from go2wm.sim.terrain import sidewalk_height
+
+    p = {"slabs": [[1.0, 1.0, 0.1]]}
+    hf = lambda x, y: sidewalk_height(x, y, p)  # noqa: E731
+    pose = np.array([[0.0, 0.0, 0.0], [0.5, 0.0, np.pi]])
+    m = start_maps(pose, hf)
+    assert m.shape == (2, len(MAP_Y), len(MAP_X))
+    iy = int(np.argmin(np.abs(MAP_Y)))
+    ix = lambda x: int(np.argmin(np.abs(MAP_X - x)))  # noqa: E731
+    assert m[0, iy, ix(1.5)] == pytest.approx(0.1) and m[0, iy, ix(0.5)] == pytest.approx(0.0)
+    assert m[1, iy, ix(1.5)] == pytest.approx(0.0)  # facing -x: the slab is behind
+    assert np.all(start_maps(pose, None) == 0)
+    # patch at the start pose (relative pose 0): relief 1 m ahead of a robot standing at x = 0.5 on the start map
+    z = sample_patch(torch.as_tensor(m[:1]), torch.tensor([[0.6, 0.0, 0.0]]))
+    assert z.shape == (1, PATCH_DIM)
+    # local x = +0.9 at robot x = 0.6 -> world 1.5 (on the slab): relative height +0.1 m = +1.0 in 10 cm units
+    assert float(z[0, 4 * 3 + 1]) == pytest.approx(1.0, abs=1e-4)
+
+
+def test_terrain_mlp_rollout_shapes():
+    import torch
+
+    from go2wm.models.state_dynamics import TerrainMLPDynamics
+    from go2wm.models.terrain_map import MAP_X, MAP_Y
+
+    m = TerrainMLPDynamics(history=4, hidden=32, layers=2)
+    B, H = 3, 5
+    out = m.rollout(torch.zeros(B, 4, 9), torch.zeros(B, 4, 3), torch.full((B, 4), 0.1), torch.zeros(B, H, 3),
+                    torch.full((B, H), 0.1), terrain_map=torch.zeros(B, len(MAP_Y), len(MAP_X)))
+    assert out["poses"].shape == (B, H, 3)
+    assert m.rollout(torch.zeros(B, 4, 9), torch.zeros(B, 4, 3), torch.full((B, 4), 0.1), torch.zeros(B, H, 3),
+                     torch.full((B, H), 0.1))["poses"].shape == (B, H, 3)

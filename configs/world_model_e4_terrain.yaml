@@ -1,0 +1,7 @@
+# MLP + local terrain patch at each predicted pose, sampled from a start-frame height map
+# (src/go2wm/models/terrain_map.py; perfect elevation map from the tile geometry).
+_base_: world_model_e4_mlp.yaml
+model:
+  type: terrain_mlp
+  hidden: 256
+  layers: 3

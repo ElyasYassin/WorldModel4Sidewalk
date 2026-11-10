@@ -39,6 +39,10 @@ geometry with any data episode.
 | E3d | Margin 0.15 m on the 5 failures | 10/10 | scenes chosen because they failed | `outputs/navigation_db_m15_*` |
 | E3e | Margin 0.15 m, all 51 | 51/51 for kinematic and learned MPC, with or without deadband | **margin tuned on these scenes; conventional not tuned** | `outputs/nav_e3e_renamed/` |
 | E3f | Frozen planners on 51 **final** scenes | conventional default 45/51, tuned 50/51, kinematic MPC 51/51, learned MPC 51/51; learned − kinematic time −0.59 s [−0.67, −0.51]; tuned conventional vs MPC p = 1.0 | flat ground, cylinders; MPC commands ≈3× less smooth | `outputs/e3f/` |
+| E1r | Rough-terrain policy tracking | Passes; much smaller dead zone (tracks 0.3 m/s lateral, partial turn in place) | flat tile | `outputs/isaac_smoke_rough/report.json` |
+| E4-S1 | Can the rough policy traverse sidewalk S1? | 6/6 reached end, 0 falls; slab slows it ≤0.12 m/s, grade ≤0.02 | curb and cross-slope drift not exercised | `outputs/e4_smoke/report.json` |
+| E4 sweep | Where does the rough policy stop following commands? (18 variants + repeats) | Stalls at steps ≥15 cm (15 cm stochastic: 4/11 pass, 1 fall); 30 % grade stalls at 0.4 m/s only (repeatable); friction ≤0.25 slips and slows. Kinematics 1 s error 0.03–0.06 m elsewhere, up to 0.76 m at steps | mostly 1 episode per cell; curb repeats incomplete | `outputs/e4_sweep/analysis.json` |
+| E4-P2 | Does a terrain height map improve prediction on unseen sidewalk tiles? (3 models × 3 seeds) | All learned models beat kinematics 2.6× at 1 s. Terrain MLP beats MLP at 2–3 s (mainly on steps; p90 −25 %) but ties the state-only GRU overall (3 s: 0.181 vs 0.184 m) | perfect elevation map; stall windows labelled plain; prediction only, no navigation test | `outputs/e4_p2/final_test/prediction_metrics.json` |
 
 Main findings so far: on flat ground, better prediction does not change navigation outcomes;
 every planner difference is explained by the locomotion dead zone and the clearance margin. Confirmed
@@ -85,5 +89,5 @@ difference survives on fresh scenes is the question for E3f.
 
 ## Not implemented / not verified
 
-Sidewalk terrain runs (code written, blocked on the rough-policy checkpoint), cameras, terrain-aware models, V-JEPA 2, scene graph,
+Terrain sweep beyond S1, terrain-aware models, cameras, terrain-aware models, V-JEPA 2, scene graph,
 voice/mission manager, any real-robot control, paper results sections.

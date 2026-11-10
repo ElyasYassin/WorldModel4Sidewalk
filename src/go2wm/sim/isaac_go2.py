@@ -97,14 +97,25 @@ class IsaacGo2Adapter:
             )
 
         # --- optional parametric sidewalk terrain (P1/E4); absent = the task's own ground (flat plane)
+        # `terrain_tiles` (list of tile params, merged over `terrain`): one column per tile, episode
+        # with seed s runs on tile s % len(tiles).
         self.terrain = c.get("terrain")
+        self.tiles: list[dict[str, Any]] | None = None
+        self._tile_origin: np.ndarray | None = None
+        if c.get("terrain_tiles"):
+            self.terrain = {**(self.terrain or {}), "_tiles": True}
         if self.terrain:
             from .terrain import make_isaac_terrain_generator, params_with_defaults
 
-            self.terrain = params_with_defaults(self.terrain)
+            base = {k: v for k, v in self.terrain.items() if k != "_tiles"}
+            if c.get("terrain_tiles"):
+                self.tiles = [params_with_defaults({**base, **t}) for t in c["terrain_tiles"]]
+                self.terrain = self.tiles[0]
+            else:
+                self.terrain = params_with_defaults(base)
             t = env_cfg.scene.terrain
             t.terrain_type = "generator"
-            t.terrain_generator = make_isaac_terrain_generator(self.terrain)
+            t.terrain_generator = make_isaac_terrain_generator(self.tiles or self.terrain)
             t.max_init_terrain_level = None
             mu = float(self.terrain["friction"])
             t.physics_material = sim_utils.RigidBodyMaterialCfg(
@@ -154,6 +165,8 @@ class IsaacGo2Adapter:
         return retrieve_file_path(c["policy_checkpoint"])
 
     def _origin(self) -> np.ndarray:
+        if self._tile_origin is not None:
+            return self._tile_origin
         return self.uenv.scene.env_origins[0].cpu().numpy().astype(np.float64)
 
     def _set_command(self, a: np.ndarray) -> None:
@@ -202,10 +215,17 @@ class IsaacGo2Adapter:
         self.scene = make_scene(scene_id, self.robot_radius, fixed_radius=float(self.cfg["obstacle_radius"]),
                                 max_obstacles=self.n_slots)
         self.scene.params = {"backend": "isaac", "obstacle_radius": self.cfg["obstacle_radius"]}
+        if self.tiles:
+            i = seed % len(self.tiles)
+            self.terrain = self.tiles[i]
+            self._tile_origin = self.uenv.scene.terrain.terrain_origins[0, i].cpu().numpy().astype(np.float64)
+            self.scene.params["terrain_tile"] = i
         if self.terrain:
             self.scene.params["terrain"] = self.terrain
             if not self.cfg.get("scene_obstacles", True):
                 self.scene.obstacles = np.zeros((0, 3))
+            if self.cfg.get("scene_bounds"):  # e.g. include the road beyond the curb (terrain runs only)
+                self.scene.bounds = tuple(float(v) for v in self.cfg["scene_bounds"])
         torch.manual_seed(seed)
         self.wrapped.reset()
         self._place_obstacles(self.scene)

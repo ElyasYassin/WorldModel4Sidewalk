@@ -17,6 +17,7 @@ def main(argv=None) -> int:
     ap.add_argument("--data", required=True)
     ap.add_argument("--out", default=None, help="default: outputs/<config stem>")
     ap.add_argument("--epochs", type=int, default=None)
+    ap.add_argument("--seed", type=int, default=None, help="override train.seed (model init + batch order)")
     args = ap.parse_args(argv)
     cfg = load_config(args.config)
     if "visual" in cfg:
@@ -26,6 +27,8 @@ def main(argv=None) -> int:
         )
     if args.epochs is not None:
         cfg["train"]["epochs"] = args.epochs
+    if args.seed is not None:
+        cfg["train"]["seed"] = args.seed
     from pathlib import Path
 
     from go2wm.models.training import train

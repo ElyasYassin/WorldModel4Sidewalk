@@ -28,10 +28,43 @@ def _rollout_np(model: DynamicsBase, w: WindowArrays, device: torch.device, bs: 
     outs: dict[str, list] = {"poses": [], "deltas": []}
     for i in range(0, len(w), bs):
         t = lambda a: torch.as_tensor(a[i : i + bs], device=device)  # noqa: E731
-        o = model.rollout(t(w.hist_feat), t(w.hist_act), t(w.hist_dt), t(w.fut_act), t(w.fut_dt))
+        tm = t(w.terrain_map) if (model.uses_terrain and w.terrain_map is not None) else None
+        o = model.rollout(t(w.hist_feat), t(w.hist_act), t(w.hist_dt), t(w.fut_act), t(w.fut_dt), terrain_map=tm)
         outs["poses"].append(o["poses"].cpu().numpy())
         outs["deltas"].append(o["deltas"].cpu().numpy())
     return {k: np.concatenate(v) for k, v in outs.items()}
+
+
+def terrain_segments(episodes: list[Episode], w: WindowArrays, H: int) -> np.ndarray:
+    """Hard-segment label per window from the TRUE future path over the full horizon (terrain
+    episodes only; '' otherwise): curb (crosses the walkway edge with a curb), step (crosses a
+    height jump >= 3 cm, i.e. a slab edge), grade (on a running slope >= 10 %), plain."""
+    from ..common.schema import state_pose2d
+    from ..sim.terrain import params_with_defaults, sidewalk_height
+
+    out = np.full(len(w), "", dtype=object)
+    poses = {}
+    for n, (ei, i) in enumerate(zip(w.episode_index, w.start_index)):
+        terrain = ((episodes[ei].meta.get("scene") or {}).get("params") or {}).get("terrain")
+        if not terrain:
+            continue
+        t = params_with_defaults(terrain)
+        if ei not in poses:
+            poses[ei] = state_pose2d(episodes[ei]["states"])
+        path = poses[ei][i : i + H + 1, :2]
+        x, y = path[:, 0], path[:, 1]
+        edge = -0.5 * t["width"]
+        if t["curb_drop"] > 0 and (np.any(y < edge) and np.any(y >= edge)):
+            out[n] = "curb"
+            continue
+        t_nocurb = {**t, "curb_drop": 0.0, "cross_slope": 0.0, "grade": []}
+        z = sidewalk_height(x, y, t_nocurb)
+        if np.any(np.abs(np.diff(z)) >= 0.03):
+            out[n] = "step"
+            continue
+        on_grade = any(np.any((x >= x0) & (x < x1)) and abs(r) >= 0.10 for x0, x1, r in t["grade"])
+        out[n] = "grade" if on_grade else "plain"
+    return out
 
 
 def evaluate_models(
@@ -49,10 +82,13 @@ def evaluate_models(
     if max(lens) < history + H:
         H = max(lens) - history
         steps = {h: s for h, s in steps.items() if s <= H}
-    w = build_windows(episodes, history, H)
-    w1 = build_windows(episodes, history, 1)
+    tmap = any(getattr(m, "uses_terrain", False) for m in models.values())
+    w = build_windows(episodes, history, H, terrain_map=tmap)
+    w1 = build_windows(episodes, history, 1, terrain_map=tmap)
     fams = np.array([episodes[i].meta.get("scene_family", "unknown") for i in w.episode_index])
     pats = np.array([episodes[i].meta.get("command_pattern", "") for i in w.episode_index])
+    segs = terrain_segments(episodes, w, H)
+    groups = {k: v for k, v in (("pattern", pats), ("segment", segs)) if any(v)}
     result: dict[str, Any] = {
         "nominal_dt_s": dt_nom,
         "horizon_steps": {str(k): v for k, v in steps.items()},
@@ -96,16 +132,17 @@ def evaluate_models(
                     for f in sorted(set(fams))
                 },
             }
-            if any(pats):
-                entry["by_pattern"] = {}
-                for pt in sorted(set(pats)):
-                    sel = pats == pt
+            for gname, lab in groups.items():
+                entry[f"by_{gname}"] = {}
+                for pt in sorted(set(lab)):
+                    sel = lab == pt
                     eps_pt = np.unique(w.episode_index[sel])
-                    pm = np.array([pe[w.episode_index == e].mean() for e in eps_pt])
-                    entry["by_pattern"][pt] = {"pos_err_m_mean": float(pe[sel].mean()),
-                                               "heading_err_deg_mean": float(np.degrees(he[sel].mean())),
-                                               "pos_err_m_ci95_over_episodes": bootstrap_ci(pm),
-                                               "n_windows": int(sel.sum()), "n_episodes": int(len(eps_pt))}
+                    pm = np.array([pe[sel & (w.episode_index == e)].mean() for e in eps_pt])
+                    entry[f"by_{gname}"][pt] = {"pos_err_m_mean": float(pe[sel].mean()),
+                                                "pos_err_m_p90": float(np.quantile(pe[sel], 0.9)),
+                                                "heading_err_deg_mean": float(np.degrees(he[sel].mean())),
+                                                "pos_err_m_ci95_over_episodes": bootstrap_ci(pm),
+                                                "n_windows": int(sel.sum()), "n_episodes": int(len(eps_pt))}
             r["open_loop"][str(h_s)] = entry
         per_window[name] = pos_err
         r["pos_err_curve_m"] = pos_err.mean(0).tolist()
@@ -113,10 +150,10 @@ def evaluate_models(
         result["models"][name] = r
         result["examples"][name] = ro["poses"][ex_idx].tolist()
     result["paired"] = paired_comparison(per_window, w.episode_index, steps)
-    if any(pats):
-        result["paired_by_pattern"] = {
-            pt: paired_comparison({k: v[pats == pt] for k, v in per_window.items()}, w.episode_index[pats == pt], steps)
-            for pt in sorted(set(pats))}
+    for gname, lab in groups.items():
+        result[f"paired_by_{gname}"] = {
+            pt: paired_comparison({k: v[lab == pt] for k, v in per_window.items()}, w.episode_index[lab == pt], steps)
+            for pt in sorted(set(lab))}
     return result
 
 

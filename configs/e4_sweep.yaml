@@ -1,0 +1,66 @@
+# E4 terrain sweep: where does the rough-terrain policy stop following its velocity command, and where
+# does it fail? One terrain feature varied at a time on an otherwise flat 3 m walkway.
+# Run: scripts\e4_sweep_queue.ps1 (one Isaac process per variant), then
+#      python scripts/analyze_terrain_sweep.py
+#
+# Probes (per episode):
+#   lane_<v>      lane-following along the walkway centre at forward speed v (traversal)
+#   straight_<v>  constant command (v, 0, 0) for `steps`, no correction (open-loop drift)
+#   curb_<v>      lane-following at v that steps DOWN off the curb to y = -2.5 at x >= 2,
+#                 then back UP onto the walkway (y = 0) at x >= 7
+# Seeds: 60000 + 100 * variant index + probe index (unique, disjoint from all other data).
+
+base_config: configs/isaac_go2_rough.yaml
+scene_bounds: [-1.0, 14.0, -3.5, 3.5]   # tile is 28 x 8 m centred on the start; includes the road
+default_probes:
+  - {name: lane_0.4, kind: lane, vx: 0.4, steps: 400}
+  - {name: lane_0.8, kind: lane, vx: 0.8, steps: 250}
+  - {name: straight_0.6, kind: straight, vx: 0.6, steps: 200}
+
+variants:
+  flat:            {}
+  slab_05:         {slabs: [[4.0, 1.5, 0.05]]}
+  slab_10:         {slabs: [[4.0, 1.5, 0.10]]}
+  slab_15:         {slabs: [[4.0, 1.5, 0.15]]}
+  slab_20:         {slabs: [[4.0, 1.5, 0.20]]}
+  slab_25:         {slabs: [[4.0, 1.5, 0.25]]}   # above the 23 cm training maximum
+  grade_15:        {grade: [[4.0, 8.0, 0.15]]}   # 8.5 deg
+  grade_30:        {grade: [[4.0, 8.0, 0.30]]}   # 16.7 deg
+  cross_06:        {cross_slope: 0.06}
+  cross_10:        {cross_slope: 0.10}
+  cross_15:        {cross_slope: 0.15}
+  cross_20:        {cross_slope: 0.20}
+  friction_06:     {friction: 0.6}               # x foot 0.8/0.6 under multiply combine
+  friction_04:     {friction: 0.4}
+  friction_025:    {friction: 0.25}
+  friction_015:    {friction: 0.15}
+  curb_15:
+    terrain: {curb_drop: 0.15}
+    probes:
+      - {name: curb_0.4, kind: curb, vx: 0.4, steps: 400}
+      - {name: curb_0.8, kind: curb, vx: 0.8, steps: 250}
+  curb_25:
+    terrain: {curb_drop: 0.25}
+    probes:
+      - {name: curb_0.4, kind: curb, vx: 0.4, steps: 400}
+      - {name: curb_0.8, kind: curb, vx: 0.8, steps: 250}
+  # Repeats of the speed-dependent cells (appended so earlier seeds are unchanged). `repeats: n`
+  # expands a probe into n episodes named <name>_r<k>, each with its own seed.
+  slab_15_rep:
+    terrain: {slabs: [[4.0, 1.5, 0.15]]}
+    probes:
+      - {name: lane_0.4, kind: lane, vx: 0.4, steps: 400, repeats: 3}
+      - {name: lane_0.6, kind: lane, vx: 0.6, steps: 300, repeats: 3}
+      - {name: lane_0.8, kind: lane, vx: 0.8, steps: 250, repeats: 3}
+  grade_30_rep:
+    terrain: {grade: [[4.0, 8.0, 0.30]]}
+    probes:
+      - {name: lane_0.4, kind: lane, vx: 0.4, steps: 400, repeats: 3}
+      - {name: lane_0.6, kind: lane, vx: 0.6, steps: 300, repeats: 3}
+      - {name: lane_0.8, kind: lane, vx: 0.8, steps: 250, repeats: 3}
+  curb_15_rep:
+    terrain: {curb_drop: 0.15}
+    probes:
+      - {name: curb_0.4, kind: curb, vx: 0.4, steps: 400, repeats: 3}
+      - {name: curb_0.6, kind: curb, vx: 0.6, steps: 300, repeats: 3}
+      - {name: curb_0.8, kind: curb, vx: 0.8, steps: 250, repeats: 3}
