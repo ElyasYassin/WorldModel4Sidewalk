@@ -1,0 +1,12 @@
+# Tuned conventional baseline, FROZEN for E3f. Chosen by scripts/select_conventional.py from
+# 8 configs on obstacle+sidewalk development scenes 0-16 only. Winner: conv_ms04_br0_inf06
+# (success 34/34, collisions 0, interventions/ep 0.0).
+_base_: planner_isaac.yaml
+reactive:
+  v_max: 0.8
+  k_yaw: 1.8
+  influence_m: 0.6
+  k_rep: 0.8
+  slow_m: 0.6
+  min_speed: 0.4
+  bound_repulsion: false

@@ -44,6 +44,7 @@ def run_episode(adapter: SimulatorAdapter, controller, seed: int, scene_id: str 
     tracker = WaypointTracker(wps, nc["waypoint_tolerance"])
     controller.reset(scene, obs)
     traj = [obs.pose2d]
+    cmds: list[list[float]] = []
     lat, safety_events, clear = [], 0, [scene.clearance(obs.pos_w[:2], cfg["robot_radius"])]
     stall, stall_events, reroutes = 0, 0, 0
     outcome = "timeout"
@@ -56,6 +57,7 @@ def run_episode(adapter: SimulatorAdapter, controller, seed: int, scene_id: str 
         wp = tracker.update(xy)
         a, info = controller.act(obs, wp)
         lat.append(info["latency_s"])
+        cmds.append([float(v) for v in a[:3]])
         safety_events += bool(info.get("safety"))
         res = adapter.step(VelocityCommand.from_action(a, cfg["control_dt"]))
         t_s += res.info.get("dt_s", cfg["control_dt"])
@@ -74,6 +76,9 @@ def run_episode(adapter: SimulatorAdapter, controller, seed: int, scene_id: str 
             break
     traj = np.array(traj)
     path_len = float(np.linalg.norm(np.diff(traj[:, :2], axis=0), axis=1).sum())
+    ca = np.asarray(cmds).reshape(-1, 3)
+    # mean per-step command change (vx, vy, yaw_rate) as a smoothness measure; lower is smoother
+    jerk = float(np.abs(np.diff(ca, axis=0)).sum(1).mean()) if len(ca) > 1 else 0.0
     return {
         "seed": seed,
         "scene_id": scene.scene_id,
@@ -91,6 +96,8 @@ def run_episode(adapter: SimulatorAdapter, controller, seed: int, scene_id: str 
         "stall_events": stall_events,
         "reroutes": reroutes,
         "latency_s": lat,
+        "command_change_mean": jerk,
+        "commands": ca.tolist(),
         "trajectory": traj.tolist(),
         "waypoints": wps.tolist(),
         "scene": scene.to_dict(),
@@ -129,6 +136,7 @@ def aggregate(results: list[dict[str, Any]]) -> dict[str, Any]:
         "min_clearance_m_worst": float(min(r["min_clearance_m"] for r in results)) if results else None,
         "safety_interventions_per_episode": mean([r["safety_interventions"] for r in results]),
         "stall_events_per_episode": mean([r["stall_events"] for r in results]),
+        "command_change_mean": mean([r.get("command_change_mean") for r in results]),
         "latency_ms_p50": float(np.percentile(lat, 50) * 1e3) if len(lat) else None,
         "latency_ms_p95": float(np.percentile(lat, 95) * 1e3) if len(lat) else None,
         "by_family": by_family,

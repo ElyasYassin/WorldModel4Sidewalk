@@ -10,14 +10,20 @@ and an existing pretrained locomotion policy turns those commands into gait.
 
 | piece | state |
 |---|---|
-| Mock backend → collect → validate → train → evaluate → navigate | working, 25 tests pass |
-| State-only dynamics (MLP, GRU) + kinematic baselines | working (mock-validated only) |
-| A* global planner, CEM local MPC, reactive baseline, safety filter | working (mock-validated only) |
-| Isaac Lab Go2 adapter (pretrained flat-terrain policy, obstacle cylinders) | see [docs/ISAAC_INTEGRATION.md](docs/ISAAC_INTEGRATION.md) |
-| V-JEPA 2 visual latent model | not implemented (Phase E); CLI fails with next steps |
+| Mock and Isaac pipelines: collect → validate → train → evaluate → navigate | working; 36 tests pass (mock) |
+| Isaac Lab Go2 adapter (pretrained flat-terrain policy, cylinder obstacles, flat ground) | working: [docs/ISAAC_INTEGRATION.md](docs/ISAAC_INTEGRATION.md) |
+| State-only dynamics (MLP, GRU) vs command kinematics | evaluated on Isaac data (E2, E2b): learned predicts better |
+| A* global planner, CEM local MPC, reactive baseline, safety filter | evaluated in Isaac on 51 dev + 51 final scenes (E3a–E3f): learned MPC ≈0.6 s faster than kinematic MPC, no success advantage; tuned conventional ties both |
+| Evaluation integrity | split audit, frozen protocol, final-test guard, fresh final tests (P0 done) |
+| Sidewalk terrain (E4) | code written (`src/go2wm/sim/terrain.py`); tile verified in Isaac with the flat policy; E4 needs the rough-terrain policy checkpoint |
+| Cameras, terrain-aware or V-JEPA 2 models | not implemented |
+| Scene graph, inspection modes, voice/mission manager | not implemented |
 | Real Go2 | read-only telemetry plan only: [docs/HARDWARE_HANDOFF.md](docs/HARDWARE_HANDOFF.md) |
 
-The mock backend is a software test harness, not Go2 physics.
+Results and artifact paths: [docs/EXPERIMENT_STATUS.md](docs/EXPERIMENT_STATUS.md) (compact) and
+[docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) (full). Evaluation roles of every seed and scene range:
+[configs/eval_protocol.yaml](configs/eval_protocol.yaml). The mock backend is a software test
+harness, not Go2 physics.
 
 ## Setup
 

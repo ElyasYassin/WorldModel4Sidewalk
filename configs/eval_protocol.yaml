@@ -1,0 +1,32 @@
+# Frozen evaluation protocol (P0, written 2026-11-09 before any final-test run).
+# Roles of every seed / scene range. Anything marked final_test must not be used for model
+# fitting, hyperparameter, cost-weight or controller tuning, or for deciding what to try next.
+# run_navigation.py refuses final-test scenes unless --final-test is passed, and every
+# --final-test run is appended to <GO2WM_ROOT>/outputs/final_test_ledger.jsonl.
+
+data:
+  # data/go2_sim, seeds 0-179 (ExplorationCommands, families open/obstacles/sidewalk).
+  # All 180 episodes have been in some train/val/test split (manifests default, v2, v2_clean_test;
+  # audit: scripts/audit_splits.py). v2_clean_test (19 eps) was looked at during E2b, so it is a
+  # development test set, not a final one.
+  development_pool: {root: data/go2_sim, seeds: [0, 179]}
+  # Collected 2026-11-09 for evaluation only. Never trained on, never used for model selection.
+  final_prediction_test: {root: data/go2_final_test, seeds: [30000, 30059], commands: exploration}
+  # Spec 10.1 held-out command patterns (HeldOutCommandPatterns), open family, never trained on.
+  command_pattern_test: {root: data/go2_cmdpattern, seeds: [40000, 40079], commands: heldout_patterns}
+
+navigation:
+  base_seed: 10000                 # scene seed = base_seed + index, scene id <family>_<seed>
+  families: [open, obstacles, sidewalk]
+  # Indices 0-16 were used in E3a-E3e, including choosing the 0.15 m clearance margin.
+  # Conventional-baseline tuning (P0.5) also uses these, and only these.
+  development: {first_index: 0, last_index: 16}
+  # First touched by the E3f confirmatory run. Untouched before 2026-11-09 (audit: max index used was 16).
+  final_test: {first_index: 17, last_index: 33}
+
+# Parameters frozen for the E3f final test (chosen on development scenes only).
+frozen_planners:
+  kinematic_mpc: {config: configs/planner_isaac_m15_all.yaml}
+  learned_mpc: {config: configs/planner_isaac_m15_all.yaml, checkpoint: outputs/state_go2_mlp/best.pt}
+  conventional_default: {config: configs/planner_isaac.yaml}
+  conventional_tuned: {config: configs/planner_isaac_conv_tuned.yaml}   # written after P0.5 dev tuning

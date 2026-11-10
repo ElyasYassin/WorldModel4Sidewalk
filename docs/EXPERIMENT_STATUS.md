@@ -1,0 +1,89 @@
+# Experiment status (compact)
+
+Snapshot for planning and review. Full narrative and tables: [EXPERIMENTS.md](EXPERIMENTS.md).
+Artifact paths are under the data root `D:/go2wm` (`configs/paths.yaml`). Every result below is
+**simulation** (Isaac Lab Go2, pretrained flat-terrain policy, flat ground, cylinder obstacles)
+unless marked mock. Nothing has run on hardware.
+
+Updated 2026-11-10.
+
+## Evaluation roles (frozen, `configs/eval_protocol.yaml`)
+
+| role | what | status |
+|---|---|---|
+| development data | `data/go2_sim`, seeds 0–179, 180 eps / 32,098 transitions | all 180 episodes have been in some fit or test split |
+| dev prediction test | manifest `v2_clean_test` (19 eps) | used in E2b; a development test, not final |
+| final prediction test | `data/go2_final_test`, seeds 30000–30059 | collected 2026-11-09, evaluation only |
+| held-out command patterns (spec §10.1) | `data/go2_cmdpattern`, seeds 40000–40079, open family | collected 2026-11-09, evaluation only |
+| dev navigation scenes | indices 0–16 (`<family>_10000`–`_10016`) | used in E3a–E3e and for conventional tuning |
+| final navigation scenes | indices 17–33 (`_10017`–`_10033`) | **used once, in E3f (2026-11-10)**; must not be used for any further tuning; guarded by `run_navigation.py --final-test`, logged to `outputs/final_test_ledger.jsonl` |
+
+Leakage audit: `python scripts/audit_splits.py --data data/go2_sim --json outputs/audit/splits_2026-11-09.json`.
+Result: no within-manifest overlap by episode, scene id, seed or geometry; one episode per scene
+(so scene-disjoint ⇒ episode-disjoint); windows never cross episodes (`tests/test_integrity.py`).
+Cross-manifest: all 9 `default` test episodes are in `v2` train/val, and 8 `v2` test episodes are
+in `default` train/val; `v2_clean_test` excludes both. Navigation scenes share no id, seed or
+geometry with any data episode.
+
+## Results so far
+
+| exp | question | result | caveat | artifacts |
+|---|---|---|---|---|
+| E1 | Does the policy track commands? | Tracks ≥0.5 m/s forward/arcs and ≥0.6 m/s lateral; **dead zone** below ~0.2–0.4 m/s planar, no turn-in-place | policy property, not a model result | `outputs/isaac_smoke/report.json` |
+| E2 | Learned vs kinematic prediction | MLP beats command kinematics in 9/9 test eps at every horizon (paired); MLP ≈ GRU | 9 test eps; same command generator as training | `outputs/state_go2_mlp/eval_test_paired/` |
+| E2b | Does 3× data help? | No reliable gain at 1–3 s; training seed matters as much as data. Learned still beats kinematics in 18–19/19 clean eps (1 s: 0.025 vs 0.058 m) | flat ground only | `outputs/state_go2_mlp_v2*/eval_clean_test/` |
+| E2c | Fresh final prediction test (60 eps) | Learned beats kinematics at every horizon (1 s: 0.030 vs 0.065 m, 59/60 eps); models within 0.005 m of each other | same command generator as training | `outputs/p0_pred/final_test/` |
+| E2d | Held-out command patterns (§10.1) | Learned still best on sine/arc/fast-switch; **worse than kinematics on out-of-range lateral commands** (3 s: 0.263 vs 0.147 m, 4× heading error); pooled 3 s advantage gone | flat ground; planner limits keep E3 inside support | `outputs/p0_pred/cmdpattern/` |
+| E3a/b | Navigation, 51 dev scenes | conventional 0.88, kinematic MPC 0.90, learned MPC 0.88; no paired differences | all failures = freezing before sidewalk gaps (dead zone) | `outputs/nav_merged_e3b/` |
+| E3c | Deadband-aware MPC | No more freezing; robot parks at the 0.3 m clearance margin instead | dev scenes | `outputs/navigation_db_{kin,learned}/` |
+| E3d | Margin 0.15 m on the 5 failures | 10/10 | scenes chosen because they failed | `outputs/navigation_db_m15_*` |
+| E3e | Margin 0.15 m, all 51 | 51/51 for kinematic and learned MPC, with or without deadband | **margin tuned on these scenes; conventional not tuned** | `outputs/nav_e3e_renamed/` |
+| E3f | Frozen planners on 51 **final** scenes | conventional default 45/51, tuned 50/51, kinematic MPC 51/51, learned MPC 51/51; learned − kinematic time −0.59 s [−0.67, −0.51]; tuned conventional vs MPC p = 1.0 | flat ground, cylinders; MPC commands ≈3× less smooth | `outputs/e3f/` |
+
+Main findings so far: on flat ground, better prediction does not change navigation outcomes;
+every planner difference is explained by the locomotion dead zone and the clearance margin. Confirmed
+on untouched scenes (E3f): a tuned conventional controller is statistically tied with both MPCs;
+learned prediction only saves ≈0.6 s per run over kinematics.
+Learned models generalize to new command timing but not to commands outside their training support.
+
+## P0 (done, 2026-11-10)
+
+| step | status | how to reproduce |
+|---|---|---|
+| Baseline commit | done, `e5195d9` | – |
+| Split audit | done (above) | `scripts/audit_splits.py` |
+| Frozen protocol + final-test guard | done | `configs/eval_protocol.yaml`, `run_navigation.py --final-test` |
+| Fresh final prediction test set | done, E2c | `scripts\p0_queue.ps1 -Phase data`; `evaluate.py --data data/go2_final_test --all-test` |
+| §10.1 held-out command patterns | done, E2d | `evaluate.py --data data/go2_cmdpattern --all-test` |
+| Conventional tuning, dev scenes only | done 2026-11-10; frozen `configs/planner_isaac_conv_tuned.yaml` | `scripts\p0_queue.ps1 -Phase tune` → `outputs/p0_tuning/` |
+| E3f: E3e confirmed on final scenes 17–33 | done 2026-11-10 | `scripts\p0_queue.ps1 -Phase final` → `outputs/e3f/` |
+
+Conventional tuning grid (`configs/tuning/`): `min_speed` {0, 0.4} (deadband-aware forward-speed
+floor, the counterpart of the MPC's deadband projection) × `bound_repulsion` {off, on} ×
+(`influence_m`, `k_rep`) {(1.0, 1.2), (0.6, 0.8)}. The default (0, off, 1.0/1.2) reuses E3b.
+Selection rule, fixed before any run: highest dev success; ties → fewer collisions → fewer safety
+interventions → shorter mean time to goal. The MPC's comparable budget was 4 configs
+(margin 0.30/0.15 × deadband on/off).
+
+Tuning result (34 obstacle + sidewalk dev scenes, `python scripts/select_conventional.py`):
+
+| config (min_speed, bound_rep, influence/k_rep) | success | collisions | interventions/ep | mean t_goal [s] |
+|---|---|---|---|---|
+| **0.4, off, 0.6/0.8 (chosen)** | **34/34** | 0 | 0.0 | 15.9 |
+| 0.4, on, 0.6/0.8 | 34/34 | 0 | 0.0 | 16.0 |
+| 0.4, on, 1.0/1.2 | 34/34 | 0 | 0.0 | 16.0 |
+| 0.4, off, 1.0/1.2 | 32/34 | 0 | 16.5 | 15.7 |
+| 0, off, 0.6/0.8 | 31/34 | 0 | 0.0 | 17.4 |
+| 0, on, 1.0/1.2 | 28/34 | 0 | 0.0 | 16.5 |
+| 0, on, 0.6/0.8 | 28/34 | 0 | 0.0 | 16.9 |
+| 0, off, 1.0/1.2 (default, E3b) | 28/34 | 0 | 9.5 | 16.1 |
+
+The deadband-aware speed floor (`min_speed` 0.4) is what fixes the conventional controller: every
+config with it reaches 32–34/34, every config without it 28–31/34. With a comparable tuning budget
+the conventional controller matches the MPCs (34/34) on the dev scenes. Whether any planner
+difference survives on fresh scenes is the question for E3f.
+
+## Not implemented / not verified
+
+Sidewalk terrain runs (code written, blocked on the rough-policy checkpoint), cameras, terrain-aware models, V-JEPA 2, scene graph,
+voice/mission manager, any real-robot control, paper results sections.

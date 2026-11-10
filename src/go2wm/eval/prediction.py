@@ -52,6 +52,7 @@ def evaluate_models(
     w = build_windows(episodes, history, H)
     w1 = build_windows(episodes, history, 1)
     fams = np.array([episodes[i].meta.get("scene_family", "unknown") for i in w.episode_index])
+    pats = np.array([episodes[i].meta.get("command_pattern", "") for i in w.episode_index])
     result: dict[str, Any] = {
         "nominal_dt_s": dt_nom,
         "horizon_steps": {str(k): v for k, v in steps.items()},
@@ -95,6 +96,16 @@ def evaluate_models(
                     for f in sorted(set(fams))
                 },
             }
+            if any(pats):
+                entry["by_pattern"] = {}
+                for pt in sorted(set(pats)):
+                    sel = pats == pt
+                    eps_pt = np.unique(w.episode_index[sel])
+                    pm = np.array([pe[w.episode_index == e].mean() for e in eps_pt])
+                    entry["by_pattern"][pt] = {"pos_err_m_mean": float(pe[sel].mean()),
+                                               "heading_err_deg_mean": float(np.degrees(he[sel].mean())),
+                                               "pos_err_m_ci95_over_episodes": bootstrap_ci(pm),
+                                               "n_windows": int(sel.sum()), "n_episodes": int(len(eps_pt))}
             r["open_loop"][str(h_s)] = entry
         per_window[name] = pos_err
         r["pos_err_curve_m"] = pos_err.mean(0).tolist()
@@ -102,6 +113,10 @@ def evaluate_models(
         result["models"][name] = r
         result["examples"][name] = ro["poses"][ex_idx].tolist()
     result["paired"] = paired_comparison(per_window, w.episode_index, steps)
+    if any(pats):
+        result["paired_by_pattern"] = {
+            pt: paired_comparison({k: v[pats == pt] for k, v in per_window.items()}, w.episode_index[pats == pt], steps)
+            for pt in sorted(set(pats))}
     return result
 
 

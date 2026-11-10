@@ -9,6 +9,10 @@ learned_mpc (CEM + learned state dynamics; needs --checkpoint), all.
 from __future__ import annotations
 
 import argparse
+import datetime as _dt
+import hashlib
+import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -24,6 +28,33 @@ from go2wm.planning.safety import SafetyFilter
 from go2wm.sim.base import make_adapter
 
 PLANNERS = ["conventional", "kinematic_mpc", "learned_mpc"]
+REPO = Path(__file__).resolve().parents[1]
+
+
+def final_test_scenes(scen: list, backend: str) -> list[str]:
+    """Scene ids in the frozen final-test index range (configs/eval_protocol.yaml)."""
+    if backend == "mock":
+        return []
+    proto = load_config(REPO / "configs" / "eval_protocol.yaml")["navigation"]
+    lo, hi = proto["final_test"]["first_index"], proto["final_test"]["last_index"]
+    return [sid for seed, sid in scen if lo <= seed - proto["base_seed"] <= hi]
+
+
+def ledger_entry(args, cfg, scen, planners) -> dict:
+    def sh(cmd):
+        try:
+            return subprocess.run(cmd, cwd=REPO, capture_output=True, text=True, timeout=20).stdout.strip()
+        except Exception:
+            return None
+    ck = None
+    if args.checkpoint:
+        ck = hashlib.sha256(resolve_path(args.checkpoint).read_bytes()).hexdigest()
+    diff = sh(["git", "diff", "HEAD"]) or ""
+    return {"utc": _dt.datetime.now(_dt.timezone.utc).isoformat(), "planners": planners, "config": args.config,
+            "config_resolved_sha256": hashlib.sha256(json.dumps(cfg, sort_keys=True, default=str).encode()).hexdigest(),
+            "checkpoint": args.checkpoint, "checkpoint_sha256": ck, "out": args.out,
+            "scenes": [sid for _, sid in scen], "git_commit": sh(["git", "rev-parse", "HEAD"]),
+            "git_dirty_diff_sha256": hashlib.sha256(diff.encode()).hexdigest() if diff else None}
 
 
 def make_controller(name: str, cfg: dict, checkpoint: str | None, seed: int = 0):
@@ -87,6 +118,9 @@ def main(argv=None) -> int:
     ap.add_argument("--first-index", type=int, default=None,
                     help="start scenario index (to extend an earlier run without repeating scenes)")
     ap.add_argument("--out", default="outputs/navigation")
+    ap.add_argument("--final-test", action="store_true",
+                    help="allow frozen final-test scenes (configs/eval_protocol.yaml); the run is logged to "
+                         "outputs/final_test_ledger.jsonl. Never use final-test results to tune anything.")
     args = ap.parse_args(argv)
 
     cfg = load_config(args.config)
@@ -100,8 +134,20 @@ def main(argv=None) -> int:
         planners = ["conventional", "kinematic_mpc"]
         print("[nav] no --checkpoint: skipping learned_mpc")
     scen = scenarios_from_cfg(cfg, args.backend)
+    ft = final_test_scenes(scen, args.backend)
+    if ft and not args.final_test:
+        raise SystemExit(f"[ERROR] {len(ft)} scenes are in the frozen final-test range ({ft[0]}...). "
+                         "Use development scenes for tuning, or pass --final-test for the confirmatory run.")
+    if args.final_test and not ft:
+        raise SystemExit("[ERROR] --final-test given but no scene is in the final-test range")
     out = resolve_path(args.out) / args.backend
     out.mkdir(parents=True, exist_ok=True)
+    if ft:
+        led = resolve_path("outputs/final_test_ledger.jsonl")
+        led.parent.mkdir(parents=True, exist_ok=True)
+        with open(led, "a", encoding="utf-8") as f:
+            f.write(json.dumps(ledger_entry(args, cfg, scen, planners)) + "\n")
+        print(f"[nav] FINAL TEST run logged to {led}", flush=True)
     adapter = make_adapter(args.backend, sim_cfg)
     results, summary = {}, {}
     try:

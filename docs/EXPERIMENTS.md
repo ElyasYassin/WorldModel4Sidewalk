@@ -202,8 +202,111 @@ lateral commands. It stands still for small planar commands, including all turn-
   ground with cylinder obstacles.
 - Explainer with figures (trajectories, deadband curve, prediction examples): https://claude.ai/artifact/93i1DcD2ecmu8ju8ZFaoA3
 
+## P0 integrity pass (2026-11-09/10)
+
+- Baseline commit `e5195d9`. Split audit `outputs/audit/splits_2026-11-09.json` (`scripts/audit_splits.py`): no
+  within-manifest overlap by episode, scene id, seed or geometry; one episode per scene; navigation scenes never share id,
+  seed or geometry with data. No data episode was untouched, so a fresh final test set was collected. Roles of every
+  seed/scene range are frozen in `configs/eval_protocol.yaml`.
+
+## E2c: fresh final prediction test (2026-11-10)
+
+- Data: `data/go2_final_test`, seeds 30000–30059, 60 episodes, same exploration generator as training, collected for
+  evaluation only (validator passes; endings 17 collision / 14 goal / 15 out_of_bounds / 14 timeout, 0 falls).
+  9,648 windows. `evaluate.py --all-test` → `outputs/p0_pred/final_test/`.
+
+| model | 0.5 s | 1 s | 2 s | 3 s | heading @3 s |
+|---|---|---|---|---|---|
+| MLP v1 seed 0 / 1 | 0.016 / 0.016 m | 0.030 / 0.030 | 0.060 / 0.060 | 0.098 / 0.098 | 6.9° / 6.8° |
+| MLP v2 seed 0 / 1 | 0.015 / 0.014 m | 0.029 / 0.027 | 0.061 / 0.055 | 0.100 / 0.091 | 6.2° / 5.5° |
+| GRU v1 / v2 | 0.017 / 0.015 m | 0.033 / 0.029 | 0.063 / 0.060 | 0.101 / 0.097 | 7.5° / 6.0° |
+| command kinematics | 0.036 m | 0.065 | 0.116 | 0.178 | 15.7° |
+
+- Paired vs MLP v1: kinematics is worse at every horizon (1 s: +0.032 m [+0.029, +0.035], 59/60 episodes). Confirms E2/E2b
+  on untouched data. Learned models differ from each other by ≤0.005 m; more data (v2) helps heading (≈1°), not position.
+
+## E2d: held-out command patterns, spec §10.1 (2026-11-10)
+
+- Data: `data/go2_cmdpattern`, seeds 40000–40079, open family, `HeldOutCommandPatterns` (20 episodes each):
+  `sine` (continuous sinusoids), `long_arc` (4–6 s steady arcs), `fast_switch` (unsmoothed, 0.2–0.3 s holds),
+  `lateral_ood` (|vy| 0.45–0.7 m/s, outside the training range |vy| ≤ 0.4). 14,787 windows.
+  → `outputs/p0_pred/cmdpattern/`.
+- Position / heading error by pattern (m / deg):
+
+| pattern | horizon | MLP v1 | GRU v1 | MLP v2 | GRU v2 | kinematics |
+|---|---|---|---|---|---|---|
+| sine | 3 s | 0.087 / 4.7 | 0.079 / 4.5 | 0.088 / 3.8 | 0.124 / 3.6 | 0.165 / 7.5 |
+| long_arc | 3 s | 0.078 / 4.6 | 0.072 / 4.9 | 0.079 / 4.8 | 0.093 / 3.0 | 0.088 / 4.8 |
+| fast_switch | 3 s | 0.110 / 7.3 | 0.074 / 5.2 | 0.143 / 4.6 | 0.103 / 4.8 | 0.156 / 4.5 |
+| lateral_ood | 1 s | 0.052 / 5.7 | 0.079 / 3.8 | 0.060 / 2.6 | 0.059 / 2.9 | 0.067 / 1.6 |
+| lateral_ood | 3 s | 0.263 / 17.7 | 0.255 / 8.4 | 0.161 / 6.5 | 0.204 / 10.1 | **0.147 / 4.5** |
+
+- Paired kinematics − MLP v1 position at 3 s: sine +0.068 [+0.037, +0.098] (17/20 MLP better), fast_switch +0.047
+  [+0.036, +0.058] (19/20), long_arc +0.013 [+0.001, +0.026] (14/20), **lateral_ood −0.100 [−0.142, −0.057] (MLP better in 3/20)**.
+- **Finding:** new temporal patterns inside the trained command range are handled (learned still best). Commands outside the
+  training support are not: every learned model is worse than command kinematics at 2–3 s on `lateral_ood`, and heading error
+  is up to 4× worse. The policy tracks |vy| ≥ 0.6 well (E1), so the kinematic assumption holds there and the learned models
+  extrapolate wrongly. Pooled over all patterns, the learned advantage at 3 s is gone (kinematics − MLP v1: +0.007 m
+  [−0.013, +0.027]).
+- Implication for planning: a learned MPC must keep its samples inside the training command support (the current Isaac planner
+  limits |vy| ≤ 0.3, so E3 is unaffected), or detect out-of-support inputs and fall back to kinematics. For P1/P2 this means
+  terrain data must cover the commands the planner will use.
+
+## Conventional tuning on dev scenes (2026-11-10)
+
+- 7 new configs (`configs/tuning/`) plus the default, 34 obstacle + sidewalk dev scenes each, ranked by the rule fixed
+  before any run (success → collisions → interventions → time). Table in `docs/EXPERIMENT_STATUS.md`.
+- `min_speed` 0.4 (a forward-speed floor above the policy dead zone) decides it: 32–34/34 with it, 28–31/34 without.
+  Chosen and frozen: `min_speed` 0.4, no bound repulsion, influence 0.6 m / k_rep 0.8 → `configs/planner_isaac_conv_tuned.yaml`
+  (34/34 on dev, equal to both MPCs).
+
+## E3f: frozen planners on final navigation scenes 17–33 (2026-11-10)
+
+- 51 untouched scenes (`open/obstacles/sidewalk_10017`–`_10033`), run once with `--final-test`; 4 ledger entries in
+  `outputs/final_test_ledger.jsonl`. Planners frozen beforehand in `configs/eval_protocol.yaml`.
+  `scripts/compare_navigation.py` → `outputs/e3f/compare*.json`.
+
+| planner | success [Wilson 95%] | collisions | falls | freezes | t_goal [s] | interventions/ep | command change/step |
+|---|---|---|---|---|---|---|---|
+| conventional, default | 45/51 0.88 [0.77, 0.94] | 0 | 0 | 6 | 14.8 | 7.4 | 0.089 |
+| conventional, tuned | 50/51 0.98 [0.90, 1.00] | 0 | 0 | 1 | 14.8 | 6.8 | 0.081 |
+| kinematic MPC (m 0.15) | 51/51 1.00 [0.93, 1.00] | 0 | 0 | 0 | 15.2 | 0.0 | 0.267 |
+| learned MPC (m 0.15) | 51/51 1.00 [0.93, 1.00] | 0 | 0 | 0 | 14.6 | 0.0 | 0.252 |
+
+- Paired success (exact McNemar): default conventional vs either MPC 0 vs 6 discordant, p = 0.031; tuned conventional vs
+  either MPC 0 vs 1, p = 1.0; default vs tuned conventional 0 vs 5, p = 0.062; kinematic vs learned MPC 0 vs 0.
+- Paired time to goal: learned − kinematic MPC **−0.59 s [−0.67, −0.51]** (dev E3e: −0.65 s), consistent in every family
+  (mean differences: open −0.6, obstacles −0.6, sidewalk −0.7 s). Tuned conventional vs MPCs: learned −0.26 s [−0.59, +0.09], kinematic
+  +0.33 s [+0.02, +0.67]. On open scenes the conventional controller is fastest (12.7 s vs 13.6/14.2 s).
+- Failures: default conventional = 5 sidewalk + 1 obstacle timeouts, all freezes (dead zone, as in E3b). Tuned
+  conventional = 1 freeze on `sidewalk_10030` of a different kind: it squeezed between an obstacle and the walkway edge to
+  0.02 m clearance, and the safety filter then zeroed its forward command for 347 steps (deadlock, not dead zone).
+  Video: `outputs/videos/05_e3f_sidewalk_10030_all4.mp4`.
+- Conventional needs the safety filter on sidewalks (≈20 interventions/ep); the MPCs never trigger it. MPC commands change
+  ≈3× more per step (0.25–0.27 vs 0.08–0.09, L1 per 0.1 s), i.e. the MPCs are much less smooth.
+- **Finding:** E3e replicates on fresh scenes. With matched tuning, the conventional controller is statistically
+  indistinguishable from the MPCs in success (50/51 vs 51/51). Learned prediction buys a small, reliable time saving
+  (≈0.6 s ≈ 4%) over kinematic prediction and no success difference. Flat ground with cylinders does not separate the
+  planners; P1 terrain is where prediction could matter.
+
+## E4 preflight: terrain mesh check with the flat policy (2026-11-10)
+
+- **Not an E4 result.** The rough-terrain checkpoint is unavailable, so the E4-S1 tile (4 % cross-slope, 8 cm slab at
+  x = 4.0–5.5 m, 6 % grade, 15 cm curb) was loaded under the *flat* policy only to verify the terrain code in the running app:
+  `configs/isaac_go2_flat_e4s1_meshcheck.yaml`, 1 episode at 0.6 m/s → `outputs/e4_meshcheck/report.json`,
+  log `D:/go2wm/logs/e4_meshcheck.log`.
+- Verified: the generated tile loads, the robot spawns at the scene origin and walks on it; height above ground on the flat
+  start section is 0.171 ± 0.001 m (flat-plane runs: median base z 0.18 m), so the tile surface matches the analytic surface
+  to within ≈5–10 mm; terrain ground-truth arrays are recorded and the episode validates.
+- The blind flat policy stopped at the slab edge (x_max 3.9 m, 40 s timeout, no fall). Expected; says nothing about E4.
+- **Open issue:** foot contact is sampled once per 0.1 s control step. Foot 0 shows a 0.3 s swing cycle, the other three
+  read "in contact" at every sample, which is either this policy's gait or aliasing. Before relying on contact/slip ground
+  truth, log contacts at physics rate (or the contact sensor's air/contact time) and check with the rough policy.
+- `ground_z_m` is NaN without a height scanner (by design); the rough policy provides one.
+
 ## Next experiments (Isaac)
-- Confirm E3e on fresh scenes (`--first-index 17`), including a tuned conventional baseline.
+- P1: sidewalk terrain with the rough-terrain policy (`configs/isaac_go2_rough_e4s1.yaml`, `scripts/isaac_terrain_smoke.py`);
+  needs the pretrained rough checkpoint.
 - Beyond that, these runs show **the learned model has no navigation advantage on flat ground with cylinders**: every planner difference is
   explained by locomotion deadband and cost tuning. Testing H1/H2 needs conditions where dynamics are hard to model by hand: sidewalk
   terrain (curbs, slopes, friction changes, from SidewalkAtlas `scripts/terrain`), and cameras with V-JEPA 2 for H1.

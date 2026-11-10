@@ -1,0 +1,10 @@
+# Isaac Go2 with NVIDIA's pretrained ROUGH-terrain policy (height-scan input) on a parametric
+# sidewalk tile (src/go2wm/sim/terrain.py). With no terrain features the tile is flat, so this
+# config with scripts/isaac_smoke.py repeats E1 (velocity tracking / dead zone) for the rough policy.
+# Needs .pretrained_checkpoints/rsl_rl/Isaac-Velocity-Rough-Unitree-Go2-v0/checkpoint.pt.
+_base_: isaac_go2.yaml
+isaac:
+  task: Isaac-Velocity-Rough-Unitree-Go2-Play-v0
+  train_task: Isaac-Velocity-Rough-Unitree-Go2-v0
+  terrain:
+    friction: 1.0          # x robot foot material (0.8 static / 0.6 dynamic) under multiply combine

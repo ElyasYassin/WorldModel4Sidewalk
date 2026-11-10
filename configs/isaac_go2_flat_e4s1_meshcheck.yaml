@@ -1,0 +1,16 @@
+# MESH CHECK ONLY, not a policy evaluation: the E4-S1 sidewalk tile under the FLAT policy (no height
+# scanner, so height above ground uses the analytic surface). Verifies in the running Isaac app that
+# the generated terrain is placed at the scene origin, spawn height is right and logging works,
+# while the rough-policy checkpoint is unavailable. Falls on the slab/curb are expected and say
+# nothing about E4.
+_base_: isaac_go2.yaml
+isaac:
+  families: [sidewalk]
+  scene_obstacles: false
+  terrain:
+    width: 3.0
+    cross_slope: 0.04
+    slabs: [[4.0, 1.5, 0.08]]
+    grade: [[7.0, 10.0, 0.06]]
+    curb_drop: 0.15
+    friction: 1.0

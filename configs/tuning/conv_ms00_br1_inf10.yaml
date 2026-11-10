@@ -1,0 +1,10 @@
+# P0.5 conventional-baseline tuning grid (development scenes 0-16 only; see configs/eval_protocol.yaml).
+_base_: ../planner_isaac.yaml
+reactive:
+  min_speed: 0.0
+  bound_repulsion: true
+  influence_m: 1.0
+  k_rep: 1.2
+navigation:
+  scenarios:
+    families: [obstacles, sidewalk]

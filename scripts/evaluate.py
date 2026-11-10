@@ -11,7 +11,7 @@ from pathlib import Path
 
 from go2wm.cli import write_json
 from go2wm.common.config import resolve_path
-from go2wm.data.dataset import load_split
+from go2wm.data.dataset import load_manifest, load_split, make_all_test_manifest, save_manifest
 from go2wm.eval.plots import plot_prediction_report
 from go2wm.eval.prediction import default_baselines, evaluate_models
 from go2wm.models.state_dynamics import load_checkpoint
@@ -28,6 +28,9 @@ def main(argv=None) -> int:
     ap.add_argument("--manifest", default=None,
                     help="split manifest name (default: the first checkpoint's). Comparing checkpoints trained on "
                          "different manifests needs a test split none of them trained on.")
+    ap.add_argument("--all-test", action="store_true",
+                    help="evaluate every episode under --data (manifest 'all_test', created on first use and then "
+                         "frozen: the run fails if episodes were added or removed since)")
     args = ap.parse_args(argv)
 
     models, cfg = {}, None
@@ -43,6 +46,14 @@ def main(argv=None) -> int:
         models.update(default_baselines(dc["history"]))
     root = resolve_path(args.data)
     manifest = args.manifest or dc.get("manifest", "default")
+    if args.all_test:
+        manifest = "all_test"
+        now = make_all_test_manifest(root)
+        if (root / "splits" / "all_test.json").exists():
+            if load_manifest(root, manifest)["episodes"]["test"] != now["episodes"]["test"]:
+                raise SystemExit(f"[ERROR] episodes under {root} changed since all_test was frozen")
+        else:
+            save_manifest(root, now, manifest)
     eps = load_split(root, args.split, manifest)
     res = evaluate_models(models, eps, dc["history"], dc["eval_horizons_s"], pick_device("auto"))
     res["split"] = args.split
@@ -67,6 +78,12 @@ def main(argv=None) -> int:
         parts = [f"{h}s {c['mean_diff_m']:+.3f} [{c['diff_ci95_over_episodes'][0]:+.3f},{c['diff_ci95_over_episodes'][1]:+.3f}]"
                  f" ep {c['episodes_ref_better']}/{c['n_episodes']}" for h, c in cmp.items()]
         print(f"[paired] {other} - {pc['reference']} pos err: " + "; ".join(parts))
+    for pt, pc in (res.get("paired_by_pattern") or {}).items():
+        line = []
+        for other, cmp in pc.get("comparisons", {}).items():
+            c = cmp.get("1.0") or next(iter(cmp.values()))
+            line.append(f"{other} {c['mean_diff_m']:+.3f} [{c['diff_ci95_over_episodes'][0]:+.3f},{c['diff_ci95_over_episodes'][1]:+.3f}]")
+        print(f"[pattern {pt}] @1s, other - {pc['reference']}: " + "; ".join(line))
     print(f"[eval] wrote {out / 'prediction_metrics.json'} and plots")
     return 0
 

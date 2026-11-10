@@ -96,6 +96,22 @@ class IsaacGo2Adapter:
                 ),
             )
 
+        # --- optional parametric sidewalk terrain (P1/E4); absent = the task's own ground (flat plane)
+        self.terrain = c.get("terrain")
+        if self.terrain:
+            from .terrain import make_isaac_terrain_generator, params_with_defaults
+
+            self.terrain = params_with_defaults(self.terrain)
+            t = env_cfg.scene.terrain
+            t.terrain_type = "generator"
+            t.terrain_generator = make_isaac_terrain_generator(self.terrain)
+            t.max_init_terrain_level = None
+            mu = float(self.terrain["friction"])
+            t.physics_material = sim_utils.RigidBodyMaterialCfg(
+                friction_combine_mode="multiply", restitution_combine_mode="multiply",
+                static_friction=mu, dynamic_friction=mu)
+            if hasattr(env_cfg, "curriculum") and hasattr(env_cfg.curriculum, "terrain_levels"):
+                env_cfg.curriculum.terrain_levels = None
         self.env = gym.make(c["task"], cfg=env_cfg)
         self.uenv = self.env.unwrapped
         self.wrapped = RslRlVecEnvWrapper(self.env)
@@ -109,6 +125,12 @@ class IsaacGo2Adapter:
         # same signal as Isaac Lab's base_contact termination (net force on base > threshold)
         self.contact = self.uenv.scene.sensors["contact_forces"]
         self.base_body_ids = self.contact.find_bodies("base")[0]
+        self.scanner = None
+        if self.terrain:  # terrain-only lookups: the flat E0-E3 path is unchanged
+            self.foot_ids = self.contact.find_bodies(".*_foot")[0]
+            self.robot_foot_ids = self.robot.find_bodies(".*_foot")[0]
+            # rough-terrain tasks carry a height scanner (policy input); used for height above ground
+            self.scanner = dict(self.uenv.scene.sensors).get("height_scanner")
         self.step_dt = float(self.uenv.step_dt)
         self.n_policy_steps = max(1, int(round(self.control_dt / self.step_dt)))
         if abs(self.n_policy_steps * self.step_dt - self.control_dt) > 1e-6:
@@ -180,6 +202,10 @@ class IsaacGo2Adapter:
         self.scene = make_scene(scene_id, self.robot_radius, fixed_radius=float(self.cfg["obstacle_radius"]),
                                 max_obstacles=self.n_slots)
         self.scene.params = {"backend": "isaac", "obstacle_radius": self.cfg["obstacle_radius"]}
+        if self.terrain:
+            self.scene.params["terrain"] = self.terrain
+            if not self.cfg.get("scene_obstacles", True):
+                self.scene.obstacles = np.zeros((0, 3))
         torch.manual_seed(seed)
         self.wrapped.reset()
         self._place_obstacles(self.scene)
@@ -189,6 +215,12 @@ class IsaacGo2Adapter:
         rs = self.robot.data.default_root_state.clone()
         rs[:, 0] = float(x + origin[0])
         rs[:, 1] = float(y + origin[1])
+        if self.terrain:
+            # default_root_state z is for flat ground at world z = 0. The generator translates the tile
+            # only in x/y, so world ground height = sidewalk_height (origin z is just the tile-centre max).
+            from .terrain import sidewalk_height
+
+            rs[:, 2] += float(sidewalk_height(x, y, self.terrain))
         rs[:, 3:7] = torch.tensor([math.cos(yaw / 2), 0.0, 0.0, math.sin(yaw / 2)], device=rs.device)
         rs[:, 7:] = 0.0
         self.robot.write_root_pose_to_sim(rs[:, :7])
@@ -225,7 +257,7 @@ class IsaacGo2Adapter:
             clear = self.scene.clearance(st["pos"][:2], self.robot_radius)
             if clear < 0:
                 collision = True
-            if st["grav"][2] > self.cfg["fall_gravity_z"] or st["pos"][2] < self.cfg["fall_min_height"]:
+            if st["grav"][2] > self.cfg["fall_gravity_z"] or self._height_above_ground(st) < self.cfg["fall_min_height"]:
                 fall = True
             elif self._base_contact():
                 # base touching something: an obstacle if we're near one, otherwise the ground
@@ -273,10 +305,49 @@ class IsaacGo2Adapter:
             "control_dt": self.control_dt,
             "robot_radius": self.robot_radius,
             "collision_detection": "geometric footprint circle vs known obstacle map",
+            "terrain": self.terrain or "task default (flat plane)",
+            "height_scanner": self.scanner is not None,
             "config": self.cfg,
         }
 
     # --- internals --------------------------------------------------------
+    def _ground_z_world(self) -> float | None:
+        """Ground height under the base from the height scanner (median of rays within 0.15 m)."""
+        if self.scanner is None:
+            return None
+        hits = self.scanner.data.ray_hits_w[0]  # [R, 3] world
+        base = self.robot.data.root_pos_w[0]
+        d = (hits[:, :2] - base[:2]).norm(dim=-1)
+        sel = hits[d < 0.15, 2]
+        sel = sel[self.torch.isfinite(sel)]
+        return float(sel.median().item()) if len(sel) else None
+
+    def _height_above_ground(self, st: dict[str, np.ndarray]) -> float:
+        if not self.terrain:
+            return float(st["pos"][2])  # flat plane at the env origin (E0-E3 behaviour)
+        g = self._ground_z_world()
+        if g is None:
+            from .terrain import sidewalk_height
+
+            g = float(sidewalk_height(st["pos"][0], st["pos"][1], self.terrain))
+            return float(st["pos"][2] + self._origin()[2] - g)
+        return float(st["pos"][2] + self._origin()[2] - g)
+
+    def _terrain_truth(self, st: dict[str, np.ndarray]) -> dict[str, Any]:
+        """Extra ground truth on terrain: height above ground, ground height, foot contacts and slip."""
+        torch = self.torch
+        out: dict[str, Any] = {"height_above_ground_m": self._height_above_ground(st)}
+        g = self._ground_z_world()
+        out["ground_z_m"] = float("nan") if g is None else g - float(self._origin()[2])
+        f = self.contact.data.net_forces_w[0, self.foot_ids]  # [4, 3]
+        contact = (f.norm(dim=-1) > 1.0)
+        vel = self.robot.data.body_lin_vel_w[0, self.robot_foot_ids, :2].norm(dim=-1)  # [4]
+        out["foot_contact"] = contact.cpu().numpy().astype(np.float64).tolist()
+        # slip = horizontal speed of feet that are in contact (0 for a perfect no-slip stance)
+        slip = torch.where(contact, vel, torch.zeros_like(vel))
+        out["foot_slip_m_s"] = slip.cpu().numpy().astype(np.float64).tolist()
+        return out
+
     def _base_contact(self) -> bool:
         f = self.contact.data.net_forces_w_history[0, :, self.base_body_ids]  # [hist, n_base, 3]
         return bool(f.norm(dim=-1).max().item() > float(self.cfg.get("base_contact_threshold_n", 1.0)))
@@ -291,6 +362,9 @@ class IsaacGo2Adapter:
     def _observe(self) -> Observation:
         s = self._raw_state()
         assert self.scene is not None
+        gt = {"clearance_m": float(self.scene.clearance(s["pos"][:2], self.robot_radius))}
+        if self.terrain:
+            gt.update(self._terrain_truth(s))
         return Observation(
             timestamp_ns=self._env_steps * self._step_ns,
             pos_w=s["pos"],
@@ -300,6 +374,6 @@ class IsaacGo2Adapter:
             gravity_b=s["grav"] / max(np.linalg.norm(s["grav"]), 1e-9),
             joint_pos=s["jp"],
             joint_vel=s["jv"],
-            ground_truth={"clearance_m": float(self.scene.clearance(s["pos"][:2], self.robot_radius))},
+            ground_truth=gt,
             valid={"rgb": False, "depth": False, "joints": True},
         )

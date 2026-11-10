@@ -2,10 +2,10 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
-build/
-dist/
-data/
-outputs/
+/build/
+/dist/
+/data/
+/outputs/
 *.pt
 *.npz
 *.mp4
