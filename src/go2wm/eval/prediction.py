@@ -35,10 +35,23 @@ def _rollout_np(model: DynamicsBase, w: WindowArrays, device: torch.device, bs: 
     return {k: np.concatenate(v) for k, v in outs.items()}
 
 
-def terrain_segments(episodes: list[Episode], w: WindowArrays, H: int) -> np.ndarray:
-    """Hard-segment label per window from the TRUE future path over the full horizon (terrain
-    episodes only; '' otherwise): curb (crosses the walkway edge with a curb), step (crosses a
-    height jump >= 3 cm, i.e. a slab edge), grade (on a running slope >= 10 %), plain."""
+def commanded_path(pose0: np.ndarray, cmds: np.ndarray, dt: np.ndarray) -> np.ndarray:
+    """Scene-frame (x, y) path [H+1, 2] if the robot followed body-frame commands (vx, vy, wz) exactly."""
+    x, y, yaw = (float(v) for v in pose0)
+    out = [(x, y)]
+    for (vx, vy, wz), d in zip(cmds[:, :3], dt):
+        c, s = np.cos(yaw), np.sin(yaw)
+        x, y, yaw = x + (c * vx - s * vy) * d, y + (s * vx + c * vy) * d, yaw + wz * d
+        out.append((x, y))
+    return np.asarray(out)
+
+
+def terrain_segments(episodes: list[Episode], w: WindowArrays, H: int, path: str = "true") -> np.ndarray:
+    """Hard-segment label per window over the full horizon (terrain episodes only; '' otherwise):
+    curb (crosses the walkway edge with a curb), step (crosses a height jump >= 3 cm, i.e. a slab
+    edge), grade (on a running slope >= 10 %), plain. path='true' uses the realized future path
+    (a robot that stalls in front of a step is then 'plain'); path='commanded' uses the path the
+    commands would produce from the start pose, i.e. the terrain the robot was asked to cross."""
     from ..common.schema import state_pose2d
     from ..sim.terrain import params_with_defaults, sidewalk_height
 
@@ -51,8 +64,12 @@ def terrain_segments(episodes: list[Episode], w: WindowArrays, H: int) -> np.nda
         t = params_with_defaults(terrain)
         if ei not in poses:
             poses[ei] = state_pose2d(episodes[ei]["states"])
-        path = poses[ei][i : i + H + 1, :2]
-        x, y = path[:, 0], path[:, 1]
+        if path == "commanded":
+            ep = episodes[ei]
+            xy = commanded_path(poses[ei][i], ep["commands"][i : i + H], ep["dt_s"][i : i + H])
+        else:
+            xy = poses[ei][i : i + H + 1, :2]
+        x, y = xy[:, 0], xy[:, 1]
         edge = -0.5 * t["width"]
         if t["curb_drop"] > 0 and (np.any(y < edge) and np.any(y >= edge)):
             out[n] = "curb"
@@ -88,7 +105,8 @@ def evaluate_models(
     fams = np.array([episodes[i].meta.get("scene_family", "unknown") for i in w.episode_index])
     pats = np.array([episodes[i].meta.get("command_pattern", "") for i in w.episode_index])
     segs = terrain_segments(episodes, w, H)
-    groups = {k: v for k, v in (("pattern", pats), ("segment", segs)) if any(v)}
+    segs_cmd = terrain_segments(episodes, w, H, path="commanded")
+    groups = {k: v for k, v in (("pattern", pats), ("segment", segs), ("segment_cmd", segs_cmd)) if any(v)}
     result: dict[str, Any] = {
         "nominal_dt_s": dt_nom,
         "horizon_steps": {str(k): v for k, v in steps.items()},

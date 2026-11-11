@@ -62,7 +62,9 @@ def train(cfg: dict[str, Any], data_root: str | Path, out_dir: str | Path, log: 
     train_eps = load_split(data_root, "train", dc.get("manifest", "default"), **mkw)
     val_eps = load_split(data_root, "val", dc.get("manifest", "default"), **mkw)
     K, H = dc["history"], dc["horizon_train"]
-    tmap = cfg["model"]["type"] == "terrain_mlp"
+    from .state_dynamics import MODEL_TYPES
+
+    tmap = getattr(MODEL_TYPES.get(cfg["model"]["type"]), "uses_terrain", False)
     w_tr = build_windows(train_eps, K, H, dc.get("stride", 1), terrain_map=tmap)
     w_va = build_windows(val_eps, K, H, dc.get("stride", 1), terrain_map=tmap)
     log(f"[train] device={device} train: {len(train_eps)} eps / {len(w_tr)} windows, val: {len(val_eps)} eps / {len(w_va)} windows")

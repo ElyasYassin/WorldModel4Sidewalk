@@ -1,0 +1,6 @@
+# GRU + local terrain patch at each predicted pose (same height map as world_model_e4_terrain.yaml).
+_base_: world_model_e4_gru.yaml
+model:
+  type: terrain_gru
+  hidden: 128
+  layers: 1

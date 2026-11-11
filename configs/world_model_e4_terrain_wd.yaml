@@ -1,0 +1,4 @@
+# Terrain MLP with 1000x weight decay (AdamW default) (E4-P2 showed the terrain MLP overfits the 12 training tiles).
+_base_: world_model_e4_terrain.yaml
+train:
+  weight_decay: 1.0e-2

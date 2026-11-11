@@ -221,7 +221,30 @@ class TerrainMLPDynamics(MLPDynamics):
         return sample_patch(terrain_map, pose)
 
 
-MODEL_TYPES = {"mlp": MLPDynamics, "gru": GRUDynamics, "terrain_mlp": TerrainMLPDynamics}
+class TerrainGRUDynamics(GRUDynamics):
+    """GRU + the same local terrain patch as TerrainMLPDynamics, fed to the output head."""
+
+    model_type = "terrain_gru"
+    uses_terrain = True
+
+    def __init__(self, history: int, hidden: int = 128, layers: int = 1, **kw):
+        from .terrain_map import PATCH_DIM
+
+        super().__init__(history, hidden, layers, **kw)
+        self.patch_dim = PATCH_DIM
+        self.head[0] = nn.Linear(hidden + self.act_dim + 1 + PATCH_DIM, hidden)
+
+    _context = TerrainMLPDynamics._context
+
+    def _step_norm(self, hf, ha, hd, a, dt, extra=None):
+        if extra is None:
+            extra = torch.zeros(a.shape[0], self.patch_dim, device=a.device, dtype=a.dtype)
+        _, h = self.gru(torch.cat([hf, ha, hd], dim=-1))
+        return self.head(torch.cat([h[-1], a, dt, extra], dim=-1))
+
+
+MODEL_TYPES = {"mlp": MLPDynamics, "gru": GRUDynamics, "terrain_mlp": TerrainMLPDynamics,
+               "terrain_gru": TerrainGRUDynamics}
 
 
 def build_model(cfg: dict[str, Any]) -> DynamicsBase:

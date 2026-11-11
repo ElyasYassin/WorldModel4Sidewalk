@@ -123,7 +123,18 @@ class IsaacGo2Adapter:
                 static_friction=mu, dynamic_friction=mu)
             if hasattr(env_cfg, "curriculum") and hasattr(env_cfg.curriculum, "terrain_levels"):
                 env_cfg.curriculum.terrain_levels = None
-        self.env = gym.make(c["task"], cfg=env_cfg)
+            if c.get("terrain_visual_color"):  # plain concrete-like surface (videos); physics unchanged
+                t.visual_material = sim_utils.PreviewSurfaceCfg(
+                    diffuse_color=tuple(float(v) for v in c["terrain_visual_color"]), roughness=0.9)
+        # --- optional follow camera for videos (needs enable_cameras: true); render_rgb() returns a frame
+        self.video = c.get("video")
+        if self.video:
+            v = env_cfg.viewer
+            v.origin_type, v.asset_name, v.env_index = "asset_root", "robot", 0
+            v.eye = tuple(float(x) for x in self.video.get("eye", (-2.2, -2.8, 1.4)))
+            v.lookat = tuple(float(x) for x in self.video.get("lookat", (0.8, 0.0, 0.1)))
+            v.resolution = tuple(int(x) for x in self.video.get("resolution", (1280, 720)))
+        self.env = gym.make(c["task"], cfg=env_cfg, render_mode="rgb_array" if self.video else None)
         self.uenv = self.env.unwrapped
         self.wrapped = RslRlVecEnvWrapper(self.env)
         agent_cfg = load_cfg_from_registry(c["task"], "rsl_rl_cfg_entry_point")
@@ -303,6 +314,10 @@ class IsaacGo2Adapter:
             termination_reason=reason,
             info={"applied_command": self._applied.tolist(), "dt_s": (self._env_steps * self._step_ns - t0) * 1e-9},
         )
+
+    def render_rgb(self) -> np.ndarray:
+        """Follow-camera RGB frame [H, W, 3] uint8 (requires isaac.video and enable_cameras)."""
+        return np.asarray(self.env.render())
 
     def close(self) -> None:
         try:

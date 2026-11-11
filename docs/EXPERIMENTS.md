@@ -428,10 +428,49 @@ lateral commands. It stands still for small planar commands, including all turn-
   - So: terrain information is useful, but the effect is modest (1–3 cm at 2–3 s) and limited to steps; the stochastic
     stall-or-climb outcome at 15–18 cm steps is not resolved by a deterministic model.
 - **Caveats.** Segment labels use the true future path, so windows where the robot stalls in front of a step are labelled
-  plain (this is why kinematics has a p90 of 1.1 m on plain). Perfect elevation map, not the robot's scanner. Prediction
-  quality only; decision utility (navigation with these models) is not tested here.
+  plain (this is why kinematics has a p90 of 1.1 m on plain). Perfect elevation map, not the robot's scanner. By chance all 6 test tiles slope
+  right-high while 8/12 training tiles slope left-high (independent seeds), so the unseen-tile test is also a
+  cross-slope-direction shift. Test-tile slabs are 5–12.5 cm. Prediction quality only; decision utility (navigation with these models) is not tested here.
 - **Next.** Terrain GRU (recurrence + terrain), stronger regularisation, a probabilistic head for step outcomes, labels
   from the commanded path; then a navigation test on sidewalk tiles to see if the prediction gain changes decisions.
+
+## E4-P2b: terrain GRU, weight decay, commanded-path labels (2026-11-10)
+
+- **Added.** `terrain_gru` (GRU 128×1, the same 16-d height patch fed to the output head;
+  `configs/world_model_e4_terrain_gru.yaml`) and `terrain_wd` (terrain MLP, AdamW weight decay 1e-2 instead of 1e-5).
+  3 seeds each, same data and epochs. New segment labels `segment_cmd`: the terrain the *commanded* path would cross
+  from the window start, so a robot that stalls in front of a step is labelled `step` (the E4-P2 `segment` labels,
+  from the realized path, are kept). All 15 checkpoints evaluated on dev-test, then on the final test. For the 9 E4-P2
+  checkpoints this is a second final-test evaluation, only to add the new labels; nothing was retrained or selected.
+- **Position error (m), seed mean ± sd.** (`outputs/e4_p2b/{devtest,final_test}/prediction_metrics.json`)
+
+| split | model | 1 s | 2 s | 3 s |
+|---|---|---|---|---|
+| dev-test | terrain GRU | 0.046 | 0.090 | 0.140 ± 0.006 |
+| | terrain MLP, wd 1e-2 | 0.043 | 0.084 | **0.128** ± 0.003 |
+| | terrain MLP | 0.044 | 0.086 | 0.133 ± 0.005 |
+| | GRU / MLP | 0.047 / 0.050 | 0.098 / 0.107 | 0.155 / 0.169 |
+| final test | terrain GRU | 0.050 | **0.103** | **0.165** ± 0.004 |
+| | terrain MLP, wd 1e-2 | 0.050 | 0.107 | 0.177 ± 0.008 |
+| | terrain MLP | 0.051 | 0.108 | 0.181 ± 0.004 |
+| | GRU / MLP | 0.050 / 0.052 | 0.112 / 0.117 | 0.184 / 0.195 |
+| | kinematics | 0.135 | 0.265 | 0.399 |
+
+- Final test, 3 s, `segment_cmd` (mean / p90): step (3614 windows) terrain GRU 0.246/0.570, terrain MLP 0.249/0.572,
+  GRU 0.288/0.720, MLP 0.293/0.682, kinematics 0.637/1.829; grade (873) 0.160 / 0.229 / 0.165 / 0.179 / 0.437; curb
+  (203) 0.287 / 0.318 / 0.272 / 0.282 / 0.423; plain (5439) 0.108 / 0.124 / 0.115 / 0.129 / 0.233.
+- **Findings.**
+  - On unseen tiles the terrain GRU is the best model: paired vs GRU (seed 0) +0.026 m at 3 s [0.015, 0.038], vs MLP
+    +0.037 [0.027, 0.048]; vs the terrain MLPs +0.012 to +0.015, CIs include 0. Combining recurrence and terrain input
+    keeps the step gain of the terrain MLP without its loss on unseen grades (terrain MLPs 0.23 m vs GRUs 0.16 m on
+    grade windows at 3 s, likely the −24 % ramp on test tile 2).
+  - Dev-test and final test disagree on the best model (dev-test would have picked `terrain_wd`, within seed noise of
+    the terrain MLP). Weight decay 1e-2 hardly regularised (train loss 0.126, same as wd 1e-5).
+  - With commanded-path labels, the stall windows move from plain to step: kinematics' plain p90 at 3 s drops from
+    1.56 to 0.50 m (dev-test), and on step windows kinematics is off by 0.64 m on average (final test) while the
+    terrain models are at 0.25 m.
+- **Caveats.** As E4-P2 (perfect map, cross-slope direction shift, prediction only). The terrain-GRU result was not
+  the dev-test winner, so treat it as one more piece of evidence, not a selected model.
 
 ## Next experiments (Isaac)
 - P1: sidewalk terrain with the rough-terrain policy (`configs/isaac_go2_rough_e4s1.yaml`, `scripts/isaac_terrain_smoke.py`);

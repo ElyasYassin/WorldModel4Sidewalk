@@ -106,16 +106,28 @@ def test_terrain_map_and_patch():
     assert float(z[0, 4 * 3 + 1]) == pytest.approx(1.0, abs=1e-4)
 
 
-def test_terrain_mlp_rollout_shapes():
+@pytest.mark.parametrize("kind", ["terrain_mlp", "terrain_gru"])
+def test_terrain_mlp_rollout_shapes(kind):
     import torch
 
-    from go2wm.models.state_dynamics import TerrainMLPDynamics
+    from go2wm.models.state_dynamics import MODEL_TYPES
     from go2wm.models.terrain_map import MAP_X, MAP_Y
 
-    m = TerrainMLPDynamics(history=4, hidden=32, layers=2)
+    m = MODEL_TYPES[kind](history=4, hidden=32, layers=2 if kind == "terrain_mlp" else 1)
     B, H = 3, 5
     out = m.rollout(torch.zeros(B, 4, 9), torch.zeros(B, 4, 3), torch.full((B, 4), 0.1), torch.zeros(B, H, 3),
                     torch.full((B, H), 0.1), terrain_map=torch.zeros(B, len(MAP_Y), len(MAP_X)))
     assert out["poses"].shape == (B, H, 3)
     assert m.rollout(torch.zeros(B, 4, 9), torch.zeros(B, 4, 3), torch.full((B, 4), 0.1), torch.zeros(B, H, 3),
                      torch.full((B, H), 0.1))["poses"].shape == (B, H, 3)
+
+
+def test_commanded_path_straight_and_turn():
+    import numpy as np
+
+    from go2wm.eval.prediction import commanded_path
+
+    p = commanded_path(np.array([1.0, 2.0, 0.0]), np.array([[0.5, 0.0, 0.0]] * 10), np.full(10, 0.1))
+    assert p.shape == (11, 2) and np.allclose(p[-1], [1.5, 2.0])
+    q = commanded_path(np.array([0.0, 0.0, np.pi / 2]), np.array([[1.0, 0.0, 0.0]]), np.array([1.0]))
+    assert np.allclose(q[-1], [0.0, 1.0], atol=1e-9)

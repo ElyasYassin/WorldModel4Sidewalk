@@ -78,7 +78,7 @@ def main(argv=None) -> int:
         parts = [f"{h}s {c['mean_diff_m']:+.3f} [{c['diff_ci95_over_episodes'][0]:+.3f},{c['diff_ci95_over_episodes'][1]:+.3f}]"
                  f" ep {c['episodes_ref_better']}/{c['n_episodes']}" for h, c in cmp.items()]
         print(f"[paired] {other} - {pc['reference']} pos err: " + "; ".join(parts))
-    for gname in ("pattern", "segment"):
+    for gname in ("pattern", "segment", "segment_cmd"):
         for pt, pc in (res.get(f"paired_by_{gname}") or {}).items():
             line = []
             for other, cmp in pc.get("comparisons", {}).items():
