@@ -472,6 +472,57 @@ lateral commands. It stands still for small planar commands, including all turn-
 - **Caveats.** As E4-P2 (perfect map, cross-slope direction shift, prediction only). The terrain-GRU result was not
   the dev-test winner, so treat it as one more piece of evidence, not a selected model.
 
+## E4-S: terrain GRU from the robot's height scanner vs a perfect map (2026-11-10)
+
+- **Question.** E4-P2b's terrain gain uses a perfect elevation map 3 m ahead. Does it survive when the terrain input
+  is the robot's own height scanner (the rough policy's ray caster: 187 rays, 1.6 × 1.0 m grid at 0.1 m, so 0.8 m
+  ahead and 0.5 m to the side, no noise)?
+- **Data.** E4 re-collected with `--record-scan` (`scripts/e4_collect_queue.ps1 -DataTag e4s`): same tiles and seeds,
+  144 train + 48 test episodes (`data/go2_e4s_{train,test}`), 0.01 % of rays missed. Re-collection is not
+  bit-identical to E4 (GPU PhysX), so this is a fresh sample; all three models here are trained and tested on it.
+  Manifests `e4` (seed 0: 100/22/22) and `all_test`; the split audit is clean for `all_test` (the dev split shares
+  tiles with train by design, as in E4).
+- **Models.** 3 seeds each, identical except for the terrain input: GRU (none), terrain GRU with the perfect map
+  (`terrain_source: analytic`), terrain GRU with the scanner map (`terrain_source: scan`: the scan at the window start,
+  interpolated onto the same map grid; beyond the scanner's reach the edge values are held, so it really sees only
+  0.8 m ahead). Configs `configs/world_model_e4s_{gru,terrain_gru,scan_gru}.yaml`.
+- **Position error (m), seed mean ± sd.** (`outputs/e4s/{devtest,final_test}/prediction_metrics.json`)
+
+| split | model | 1 s | 2 s | 3 s |
+|---|---|---|---|---|
+| dev-test | GRU | 0.047 | 0.098 | 0.155 ± 0.004 |
+| | terrain GRU, perfect map | 0.046 | 0.090 | **0.140** ± 0.008 |
+| | terrain GRU, scanner | 0.047 | 0.096 | 0.149 ± 0.002 |
+| final test | GRU | 0.050 | 0.112 | 0.184 ± 0.003 |
+| | terrain GRU, perfect map | 0.050 | **0.103** | **0.165** ± 0.005 |
+| | terrain GRU, scanner | 0.051 | 0.108 | 0.176 ± 0.004 |
+| | kinematics | 0.135 | 0.265 | 0.399 |
+
+- **Gain over the GRU on the final test, by `segment_cmd`** (seed-mean error minus seed-mean GRU error, m; range over
+  the 3 seeds in brackets):
+
+| segment (episodes) | map 2 s | scanner 2 s | map 3 s | scanner 3 s |
+|---|---|---|---|---|
+| step (38) | −0.022 [−0.027, −0.019] | −0.015 [−0.024, −0.010] | −0.040 [−0.051, −0.032] | −0.016 [−0.031, −0.008] |
+| grade (18) | −0.007 | −0.005 | −0.007 | −0.016 |
+| curb (7) | −0.003 | +0.005 | +0.003 | −0.003 |
+| plain (48) | −0.002 | −0.000 | −0.009 | −0.005 |
+
+- **Findings.**
+  - The E4-P2b result replicates on fresh data: GRU 0.184 and perfect-map terrain GRU 0.165 m at 3 s, the same
+    numbers as before.
+  - The scanner keeps part of the gain. On step windows of unseen tiles it recovers about 70 % of the perfect map's
+    gain at 2 s, but only 40 % at 3 s. At 0.3–0.9 m/s the robot covers 0.9–2.7 m in 3 s, mostly beyond the scanner's
+    0.8 m reach, so this is what a short-range sensor should give: it helps for what is about to be stepped on, not
+    for terrain further ahead.
+  - On dev-test (seen tiles) the scanner's gain is within seed noise overall and slightly negative on steps at 2 s
+    (+0.007), so the step gain is not robust across splits. Grades and curbs: differences are within the seed range.
+- **Caveats.** The scanner is noise-free and has no occlusion (it ray-casts from 20 m above), so this is an upper bound
+  for a real height scan. Its map comes from a single frame; accumulating scans over time (an elevation map as the
+  robot walks) would extend the range behind and around, not ahead. The cross-slope direction shift between train
+  and test tiles (E4-P2) still applies. Prediction only, no navigation test. Gains are small in absolute terms
+  (1–4 cm on a 0.18–0.29 m error).
+
 ## Next experiments (Isaac)
 - P1: sidewalk terrain with the rough-terrain policy (`configs/isaac_go2_rough_e4s1.yaml`, `scripts/isaac_terrain_smoke.py`);
   needs the pretrained rough checkpoint.

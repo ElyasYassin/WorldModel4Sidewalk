@@ -205,13 +205,18 @@ class TerrainMLPDynamics(MLPDynamics):
     model_type = "terrain_mlp"
     uses_terrain = True
 
-    def __init__(self, history: int, hidden: int = 256, layers: int = 3, **kw):
+    def __init__(self, history: int, hidden: int = 256, layers: int = 3, terrain_source: str = "analytic", **kw):
         from .terrain_map import PATCH_DIM
 
         super().__init__(history, hidden, layers, **kw)
+        assert terrain_source in ("analytic", "scan"), terrain_source
+        self.terrain_source = terrain_source  # analytic = perfect tile geometry; scan = robot's height scanner
         self.patch_dim = PATCH_DIM
         d_in = history * (self.feat_dim + self.act_dim + 1) + self.act_dim + 1 + PATCH_DIM
         self.net[0] = nn.Linear(d_in, hidden)
+
+    def kwargs(self):
+        return {**super().kwargs(), "terrain_source": self.terrain_source}
 
     def _context(self, pose, terrain_map):
         from .terrain_map import sample_patch
@@ -227,14 +232,19 @@ class TerrainGRUDynamics(GRUDynamics):
     model_type = "terrain_gru"
     uses_terrain = True
 
-    def __init__(self, history: int, hidden: int = 128, layers: int = 1, **kw):
+    def __init__(self, history: int, hidden: int = 128, layers: int = 1, terrain_source: str = "analytic", **kw):
         from .terrain_map import PATCH_DIM
 
         super().__init__(history, hidden, layers, **kw)
+        assert terrain_source in ("analytic", "scan"), terrain_source
+        self.terrain_source = terrain_source
         self.patch_dim = PATCH_DIM
         self.head[0] = nn.Linear(hidden + self.act_dim + 1 + PATCH_DIM, hidden)
 
     _context = TerrainMLPDynamics._context
+
+    def kwargs(self):
+        return {**super().kwargs(), "terrain_source": self.terrain_source}
 
     def _step_norm(self, hf, ha, hd, a, dt, extra=None):
         if extra is None:

@@ -64,9 +64,12 @@ def train(cfg: dict[str, Any], data_root: str | Path, out_dir: str | Path, log: 
     K, H = dc["history"], dc["horizon_train"]
     from .state_dynamics import MODEL_TYPES
 
-    tmap = getattr(MODEL_TYPES.get(cfg["model"]["type"]), "uses_terrain", False)
-    w_tr = build_windows(train_eps, K, H, dc.get("stride", 1), terrain_map=tmap)
-    w_va = build_windows(val_eps, K, H, dc.get("stride", 1), terrain_map=tmap)
+    uses_t = getattr(MODEL_TYPES.get(cfg["model"]["type"]), "uses_terrain", False)
+    scan = uses_t and cfg["model"].get("terrain_source", "analytic") == "scan"
+    w_tr = build_windows(train_eps, K, H, dc.get("stride", 1), terrain_map=uses_t and not scan, terrain_scan=scan)
+    w_va = build_windows(val_eps, K, H, dc.get("stride", 1), terrain_map=uses_t and not scan, terrain_scan=scan)
+    if scan:  # the model reads `terrain_map`; feed it the scanner-built map
+        w_tr.terrain_map, w_va.terrain_map = w_tr.terrain_map_scan, w_va.terrain_map_scan
     log(f"[train] device={device} train: {len(train_eps)} eps / {len(w_tr)} windows, val: {len(val_eps)} eps / {len(w_va)} windows")
 
     model = build_model(cfg)

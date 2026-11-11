@@ -28,7 +28,8 @@ def _rollout_np(model: DynamicsBase, w: WindowArrays, device: torch.device, bs: 
     outs: dict[str, list] = {"poses": [], "deltas": []}
     for i in range(0, len(w), bs):
         t = lambda a: torch.as_tensor(a[i : i + bs], device=device)  # noqa: E731
-        tm = t(w.terrain_map) if (model.uses_terrain and w.terrain_map is not None) else None
+        src = w.terrain_map_scan if getattr(model, "terrain_source", "analytic") == "scan" else w.terrain_map
+        tm = t(src) if (model.uses_terrain and src is not None) else None
         o = model.rollout(t(w.hist_feat), t(w.hist_act), t(w.hist_dt), t(w.fut_act), t(w.fut_dt), terrain_map=tm)
         outs["poses"].append(o["poses"].cpu().numpy())
         outs["deltas"].append(o["deltas"].cpu().numpy())
@@ -99,9 +100,11 @@ def evaluate_models(
     if max(lens) < history + H:
         H = max(lens) - history
         steps = {h: s for h, s in steps.items() if s <= H}
-    tmap = any(getattr(m, "uses_terrain", False) for m in models.values())
-    w = build_windows(episodes, history, H, terrain_map=tmap)
-    w1 = build_windows(episodes, history, 1, terrain_map=tmap)
+    tm = [m for m in models.values() if getattr(m, "uses_terrain", False)]
+    kw = dict(terrain_map=any(getattr(m, "terrain_source", "analytic") == "analytic" for m in tm),
+              terrain_scan=any(getattr(m, "terrain_source", "analytic") == "scan" for m in tm))
+    w = build_windows(episodes, history, H, **kw)
+    w1 = build_windows(episodes, history, 1, **kw)
     fams = np.array([episodes[i].meta.get("scene_family", "unknown") for i in w.episode_index])
     pats = np.array([episodes[i].meta.get("command_pattern", "") for i in w.episode_index])
     segs = terrain_segments(episodes, w, H)

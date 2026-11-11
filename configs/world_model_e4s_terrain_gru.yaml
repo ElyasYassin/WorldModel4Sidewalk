@@ -1,0 +1,2 @@
+# E4-S (scanner) data, data/go2_e4s_train: terrain_gru. Perfect-map vs robot height-scanner terrain input.
+_base_: world_model_e4_terrain_gru.yaml

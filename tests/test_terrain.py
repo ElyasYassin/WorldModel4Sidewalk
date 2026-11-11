@@ -131,3 +131,26 @@ def test_commanded_path_straight_and_turn():
     assert p.shape == (11, 2) and np.allclose(p[-1], [1.5, 2.0])
     q = commanded_path(np.array([0.0, 0.0, np.pi / 2]), np.array([[1.0, 0.0, 0.0]]), np.array([1.0]))
     assert np.allclose(q[-1], [0.0, 1.0], atol=1e-9)
+
+
+def test_scan_maps_match_analytic_inside_scan_and_clamp_outside():
+    import numpy as np
+
+    from go2wm.models.terrain_map import MAP_X, MAP_Y, scan_maps, start_maps
+    from go2wm.sim.terrain import sidewalk_height
+
+    p = {"width": 3.0, "cross_slope": 0.0, "grade": [], "slabs": [[0.5, 1.0, 0.1]], "curb_drop": 0.0}
+    xs, ys = np.round(np.arange(-0.8, 0.8001, 0.1), 3), np.round(np.arange(-0.5, 0.5001, 0.1), 3)
+    gx, gy = np.meshgrid(xs, ys, indexing="ij")
+    pat = np.stack([gx.ravel(), gy.ravel()], 1)
+    pose = np.array([[0.0, 0.0, 0.0]])
+    scan = sidewalk_height(pat[:, 0], pat[:, 1], p)[None] + 0.37  # arbitrary scene offset
+    m = scan_maps(scan, pat)[0]
+    ref = start_maps(pose, lambda x, y: sidewalk_height(x, y, p))[0]
+    # on scan grid points (0.1 m) inside the scanned area the two maps agree exactly
+    inside = (np.abs(MAP_X)[None, :] <= 0.8) & (np.abs(MAP_Y)[:, None] <= 0.5)
+    assert np.allclose(m[inside], ref[inside], atol=1e-6)
+    # beyond the 0.8 m scan range the map holds the edge value (the slab ends at 1.5 m, unseen)
+    edge = int(np.argmin(np.abs(MAP_X - 0.8)))
+    assert np.allclose(m[:, MAP_X >= 0.8], m[:, [edge]], atol=1e-6)
+    assert not np.allclose(ref[:, MAP_X >= 0.8], ref[:, [edge]])

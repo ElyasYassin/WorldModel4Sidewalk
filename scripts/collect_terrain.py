@@ -32,13 +32,15 @@ def main(argv=None) -> int:
     ap.add_argument("--config", default="configs/isaac_go2_rough.yaml")
     ap.add_argument("--max-steps", type=int, default=300)
     ap.add_argument("--data", default=None)
+    ap.add_argument("--record-scan", action="store_true", help="also record the full height-scanner grid (scan_height_m)")
     args = ap.parse_args(argv)
     base_seed, default_data = SPLITS[args.split]
     with open(args.tiles, encoding="utf-8") as f:
         tiles = yaml.safe_load(f)[args.split]
     cfg = copy.deepcopy(load_config(args.config))
     c = cfg["isaac"]
-    c.update(families=["sidewalk"], scene_obstacles=False, scene_bounds=[-1.0, 14.0, -3.5, 3.5], terrain_tiles=tiles)
+    c.update(families=["sidewalk"], scene_obstacles=False, scene_bounds=[-1.0, 14.0, -3.5, 3.5], terrain_tiles=tiles,
+             record_height_scan=args.record_scan)
     cc = load_config("configs/isaac_go2.yaml")["collect"]
 
     from go2wm.data.recorder import collect_episodes

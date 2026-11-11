@@ -342,6 +342,8 @@ class IsaacGo2Adapter:
             "collision_detection": "geometric footprint circle vs known obstacle map",
             "terrain": self.terrain or "task default (flat plane)",
             "height_scanner": self.scanner is not None,
+            "height_scan_pattern_xy": (self.scanner.ray_starts[0, :, :2].cpu().numpy().round(4).tolist()
+                                       if (self.scanner is not None and self.cfg.get("record_height_scan")) else None),
             "config": self.cfg,
         }
 
@@ -381,6 +383,10 @@ class IsaacGo2Adapter:
         # slip = horizontal speed of feet that are in contact (0 for a perfect no-slip stance)
         slip = torch.where(contact, vel, torch.zeros_like(vel))
         out["foot_slip_m_s"] = slip.cpu().numpy().astype(np.float64).tolist()
+        if self.cfg.get("record_height_scan") and self.scanner is not None:
+            z = self.scanner.data.ray_hits_w[0, :, 2] - float(self._origin()[2])
+            z = torch.where(torch.isfinite(z), z, torch.full_like(z, float("nan")))
+            out["scan_height_m"] = z.cpu().numpy().astype(np.float64).tolist()
         return out
 
     def _base_contact(self) -> bool:

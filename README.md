@@ -10,7 +10,7 @@ and an existing pretrained locomotion policy turns those commands into gait.
 
 | piece | state |
 |---|---|
-| Mock and Isaac pipelines: collect → validate → train → evaluate → navigate | working; 39 tests pass (mock) |
+| Mock and Isaac pipelines: collect → validate → train → evaluate → navigate | working; 42 tests pass (mock) |
 | Isaac Lab Go2 adapter (pretrained flat-terrain policy, cylinder obstacles, flat ground) | working: [docs/ISAAC_INTEGRATION.md](docs/ISAAC_INTEGRATION.md) |
 | State-only dynamics (MLP, GRU) vs command kinematics | evaluated on Isaac data (E2, E2b): learned predicts better |
 | A* global planner, CEM local MPC, reactive baseline, safety filter | evaluated in Isaac on 51 dev + 51 final scenes (E3a–E3f): learned MPC ≈0.6 s faster than kinematic MPC, no success advantage; tuned conventional ties both |

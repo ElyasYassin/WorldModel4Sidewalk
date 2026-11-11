@@ -33,9 +33,10 @@ class EpisodeRecorder:
         self._obs_ts = [first_obs.timestamp_ns]
         self._dist = [self._goal_dist(first_obs)]
         self._clear = [first_obs.ground_truth.get("clearance_m", np.nan)]
-        # extra ground truth declared in ARRAY_SPEC (terrain runs), recorded when the backend reports it
+        # extra ground truth (gt_<k>) and sensor arrays (scan_*) declared in ARRAY_SPEC, recorded when
+        # the backend reports them in Observation.ground_truth
         self._gt_extra = {k: [v] for k, v in first_obs.ground_truth.items()
-                          if k != "clearance_m" and f"gt_{k}" in ARRAY_SPEC}
+                          if k != "clearance_m" and (f"gt_{k}" in ARRAY_SPEC or (k.startswith("scan_") and k in ARRAY_SPEC))}
         self._cmds: list[np.ndarray] = []
         self._act_ts: list[int] = []
         self._flags: list[tuple[bool, bool, bool, int]] = []
@@ -103,7 +104,7 @@ class EpisodeRecorder:
             "gt_clearance_m": np.array(self._clear, dtype=np.float64),
         }
         for k, v in self._gt_extra.items():
-            arrays[f"gt_{k}"] = np.asarray(v, dtype=np.float64)
+            arrays[k if k.startswith("scan_") else f"gt_{k}"] = np.asarray(v, dtype=np.float64)
         self.meta["num_transitions"] = len(self._cmds)
         self.meta["duration_s"] = float(arrays["dt_s"].sum())
         return Episode(meta=self.meta, arrays=arrays)

@@ -46,6 +46,37 @@ def start_maps(pose: np.ndarray, height_fn) -> np.ndarray:
     return (height_fn(wx, wy) - z0).astype(np.float32)
 
 
+def scan_maps(scans: np.ndarray, pattern_xy: np.ndarray) -> np.ndarray:
+    """Height-scanner scans [N, R] (scene-frame hit heights; rays at yaw-aligned body offsets
+    pattern_xy [R, 2], a regular grid) -> maps [N, len(MAP_Y), len(MAP_X)] on the MAP grid, heights
+    relative to the scan at the base. Outside the scanned area the edge values are held (bilinear
+    with clamping), i.e. the model only sees as far as the sensor. Missed rays take the scan median."""
+    pattern_xy = np.asarray(pattern_xy, dtype=np.float64)
+    xs = np.unique(np.round(pattern_xy[:, 0], 3))
+    ys = np.unique(np.round(pattern_xy[:, 1], 3))
+    ix = np.searchsorted(xs, np.round(pattern_xy[:, 0], 3))
+    iy = np.searchsorted(ys, np.round(pattern_xy[:, 1], 3))
+    scans = np.asarray(scans, dtype=np.float64)
+    fin = np.isfinite(scans)
+    med = np.nanmedian(np.where(fin, scans, np.nan), axis=1, keepdims=True)
+    scans = np.where(fin, scans, np.nan_to_num(med))
+    grid = np.zeros((len(scans), len(ys), len(xs)))
+    grid[:, iy, ix] = scans
+
+    def bilinear(qx, qy):  # qx, qy broadcastable arrays in metres -> [N, *shape]
+        fx = np.clip((qx - xs[0]) / (xs[1] - xs[0]), 0, len(xs) - 1)
+        fy = np.clip((qy - ys[0]) / (ys[1] - ys[0]), 0, len(ys) - 1)
+        x0, y0 = np.minimum(fx.astype(int), len(xs) - 2), np.minimum(fy.astype(int), len(ys) - 2)
+        ax, ay = fx - x0, fy - y0
+        g = lambda j, i: grid[:, j, i]  # noqa: E731
+        return ((1 - ax) * (1 - ay) * g(y0, x0) + ax * (1 - ay) * g(y0, x0 + 1)
+                + (1 - ax) * ay * g(y0 + 1, x0) + ax * ay * g(y0 + 1, x0 + 1))
+
+    gx, gy = np.meshgrid(MAP_X, MAP_Y)
+    z0 = bilinear(np.zeros(1), np.zeros(1))[:, 0]
+    return (bilinear(gx, gy) - z0[:, None, None]).astype(np.float32)
+
+
 def sample_patch(maps: torch.Tensor, pose: torch.Tensor) -> torch.Tensor:
     """maps [B, NY, NX], pose [B, 3] relative to the start pose -> patch features [B, PATCH_DIM]."""
     B = maps.shape[0]

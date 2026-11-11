@@ -32,9 +32,13 @@ ARRAY_SPEC: dict[str, tuple[str, str]] = {
     "gt_ground_z_m": ("float64", "obs"),  # ground under the base, scene frame
     "gt_foot_contact": ("float64", "obs"),  # [T+1, 4] 0/1, FL FR RL RR order as the robot's body list
     "gt_foot_slip_m_s": ("float64", "obs"),  # [T+1, 4] horizontal speed of feet in contact
+    # robot sensor (model input allowed): height-scanner ray hit heights, scene frame [T+1, R]; ray
+    # offsets in the yaw-aligned body frame are in meta.simulator.height_scan_pattern_xy
+    "scan_height_m": ("float64", "obs"),
 }
 TERRAIN_GT = ("gt_height_above_ground_m", "gt_ground_z_m", "gt_foot_contact", "gt_foot_slip_m_s")
-OPTIONAL_ARRAYS = {"gt_clearance_m", "distance_to_goal_m", "progress_to_waypoint_m", *TERRAIN_GT}
+SENSOR_ARRAYS = ("scan_height_m",)
+OPTIONAL_ARRAYS = {"gt_clearance_m", "distance_to_goal_m", "progress_to_waypoint_m", *TERRAIN_GT, *SENSOR_ARRAYS}
 
 
 @dataclass
