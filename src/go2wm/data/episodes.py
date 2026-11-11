@@ -89,7 +89,23 @@ def load_episode(path: str | Path, load_arrays: bool = True) -> Episode:
     if load_arrays:
         with np.load(p.with_suffix(".npz")) as z:
             arrays = {k: z[k] for k in z.files}
+        arrays.update(load_derived(p.parent.parent, meta["episode_id"]))
     return Episode(meta=meta, arrays=arrays)
+
+
+def load_derived(root: str | Path, episode_id: str) -> dict[str, np.ndarray]:
+    """Arrays computed after collection (pretrained-model features, RGB-depth elevation grids) live in
+    <root>/derived/<name>/<episode_id>.npz so recorded episodes are never rewritten. Each file's arrays
+    are merged into the episode under their stored names (e.g. sensor_rgbda_elev_m, feat_dinov2s_cls)."""
+    out: dict[str, np.ndarray] = {}
+    d = Path(root) / "derived"
+    if d.is_dir():
+        for sub in sorted(d.iterdir()):
+            f = sub / f"{episode_id}.npz"
+            if f.exists():
+                with np.load(f) as z:
+                    out.update({k: z[k] for k in z.files})
+    return out
 
 
 def save_rgb_video(path: Path, frames: np.ndarray, fps: float = 10.0) -> dict[str, Any]:

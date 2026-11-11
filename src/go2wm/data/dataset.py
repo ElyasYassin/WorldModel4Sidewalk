@@ -110,6 +110,8 @@ class WindowArrays:
     terrain_map: np.ndarray | None = None  # [N, NY, NX] start-frame height map (terrain models only)
     terrain_map_scan: np.ndarray | None = None  # same grid, built from the robot's height scan
     terrain_map_sensor: dict | None = None  # {"sensor:<name>": maps} from E4-C sensor elevation grids
+    context_feats: dict | None = None  # {array name: [N, D]} start-frame image features (image models)
+    context: np.ndarray | None = None  # the concatenation one model uses (set by training/eval)
 
     def __len__(self) -> int:
         return len(self.hist_feat)
@@ -117,14 +119,16 @@ class WindowArrays:
 
 def build_windows(episodes: list[Episode], history: int, horizon: int, stride: int = 1,
                   terrain_map: bool = False, terrain_scan: bool = False,
-                  terrain_sensors: tuple[str, ...] = ()) -> WindowArrays:
+                  terrain_sensors: tuple[str, ...] = (), context_keys: tuple[str, ...] = ()) -> WindowArrays:
     """Windows never cross episode boundaries; history needs K prior transitions.
     terrain_map=True adds a start-frame height map per window from the tile geometry (zeros on flat
     ground); terrain_scan=True adds the same map built from the height scan at the window start;
     terrain_sensors=("sensor:depth_d555", "sensor:depth_d555+l1@10", ...) adds maps from E4-C sensor
     grids: one or more sensors ("+"), accumulated over the last N frames ("@N", default 1)."""
     K, H = history, horizon
-    out: dict[str, list] = {k: [] for k in WindowArrays.__dataclass_fields__ if not k.startswith("terrain_map")}
+    out: dict[str, list] = {k: [] for k in WindowArrays.__dataclass_fields__
+                            if not k.startswith(("terrain_map", "context"))}
+    ctx: dict[str, list] = {k: [] for k in context_keys}
     maps: list[np.ndarray] = []
     smaps: list[np.ndarray] = []
     sens: dict[str, list] = {k: [] for k in terrain_sensors}
@@ -179,6 +183,12 @@ def build_windows(episodes: list[Episode], history: int, horizon: int, stride: i
                         sens[k].append(np.zeros((len(idx), len(MAP_Y), len(MAP_X)), np.float32))
                     else:
                         sens[k].append(fused_sensor_maps([ep[a] for a in arrs], pose, idx, gz, frames))
+        if context_keys:
+            idx = np.arange(K, T - H + 1, stride)  # frame i of the RGB video is state i
+            for k in context_keys:
+                if k not in ep.arrays:
+                    raise KeyError(f"{ep.episode_id} has no '{k}' (run scripts/extract_rgb_features.py)")
+                ctx[k].append(np.asarray(ep[k][idx], np.float32).reshape(len(idx), -1))
     if not out["hist_feat"]:
         raise ValueError(f"no windows (history={K}, horizon={H}); episodes too short?")
     w = WindowArrays(**{k: np.asarray(v, dtype=np.float32 if k not in ("episode_index", "start_index") else np.int64) for k, v in out.items()})
@@ -188,6 +198,8 @@ def build_windows(episodes: list[Episode], history: int, horizon: int, stride: i
         w.terrain_map_scan = np.concatenate(smaps).astype(np.float32)
     if terrain_sensors:
         w.terrain_map_sensor = {k: np.concatenate(v).astype(np.float32) for k, v in sens.items()}
+    if context_keys:
+        w.context_feats = {k: np.concatenate(v) for k, v in ctx.items()}
     return w
 
 

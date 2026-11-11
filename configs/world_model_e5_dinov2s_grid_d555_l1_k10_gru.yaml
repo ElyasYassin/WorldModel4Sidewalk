@@ -1,0 +1,7 @@
+# E5 (option A1): GRU + frozen pretrained image features of the front camera at the window start (data/go2_e4c_train).
+# Fused D555 + L1 map (10 frames) + DINOv2-small 2 x 2 grid: does vision add to geometry?
+_base_: world_model_e4_terrain_gru.yaml
+model:
+  type: image_terrain_gru
+  terrain_source: "sensor:depth_d555+l1@10"
+  context_keys: [feat_dinov2s_grid]

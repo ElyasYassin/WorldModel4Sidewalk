@@ -234,3 +234,29 @@ def test_fused_sensor_maps_single_frame_and_motion():
     ix = lambda x: int(np.argmin(np.abs(MAP_X - x)))  # noqa: E731
     assert abs(fused[0, 12, ix(0.0)]) < 1e-3 and abs(fused[0, 12, ix(0.5)] - 0.1) < 1e-3
     assert abs(one[0, 12, ix(0.0)] - 0.1) < 1e-3  # single frame: step edge filled into the blind zone
+
+
+def test_image_context_models_roundtrip(tmp_path):
+    import torch
+
+    from go2wm.models.state_dynamics import load_checkpoint, save_checkpoint
+    from go2wm.models.state_dynamics import ImageGRUDynamics, ImageTerrainGRUDynamics
+    from go2wm.models.terrain_map import MAP_X, MAP_Y
+
+    B, K, H, D = 5, 4, 6, 12
+    hf, ha, hd = torch.randn(B, K, 9), torch.randn(B, K, 3), torch.full((B, K), 0.1)
+    fa, fd = torch.randn(B, H, 3), torch.full((B, H), 0.1)
+    ctx = torch.randn(B, D)
+    for cls, kw in ((ImageGRUDynamics, {}), (ImageTerrainGRUDynamics, {"terrain_source": "sensor:depth_d555+l1@10"})):
+        m = cls(history=K, context_keys=["feat_x"], context_dim=D, **kw).eval()
+        tm = torch.zeros(B, len(MAP_Y), len(MAP_X)) if m.uses_terrain else None
+        out = m.rollout(hf, ha, hd, fa, fd, terrain_map=tm, context=ctx)
+        assert out["poses"].shape == (B, H, 3)
+        # the context changes the prediction, and a checkpoint reproduces it
+        other = m.rollout(hf, ha, hd, fa, fd, terrain_map=tm, context=ctx + 3.0)
+        assert not torch.allclose(out["poses"], other["poses"])
+        save_checkpoint(tmp_path / "m.pt", m)
+        m2, _ = load_checkpoint(tmp_path / "m.pt")
+        assert torch.allclose(out["poses"], m2.rollout(hf, ha, hd, fa, fd, terrain_map=tm, context=ctx)["poses"])
+        with pytest.raises(ValueError):
+            m.rollout(hf, ha, hd, fa, fd, terrain_map=tm, context=None)

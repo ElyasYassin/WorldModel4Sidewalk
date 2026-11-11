@@ -28,12 +28,14 @@ def to_tensors(w: WindowArrays, device: torch.device) -> dict[str, torch.Tensor]
     out = {k: torch.as_tensor(getattr(w, k), device=device) for k in BATCH_KEYS}
     if w.terrain_map is not None:
         out["terrain_map"] = torch.as_tensor(w.terrain_map, device=device)
+    if w.context is not None:
+        out["context"] = torch.as_tensor(w.context, device=device)
     return out
 
 
 def batch_loss(model: DynamicsBase, b: dict[str, torch.Tensor], rollout_weight: float, huber_delta: float) -> torch.Tensor:
     out = model.rollout(b["hist_feat"], b["hist_act"], b["hist_dt"], b["fut_act"], b["fut_dt"], return_normalized=True,
-                        terrain_map=b.get("terrain_map"))
+                        terrain_map=b.get("terrain_map"), context=b.get("context"))
     return rollout_loss(out["deltas_norm"], model.target_norm(b["targets"]), rollout_weight, huber_delta)
 
 
@@ -46,7 +48,8 @@ def evaluate_loss(model, data: dict[str, torch.Tensor], tc: dict[str, Any], bs: 
         b = {k: v[i : i + bs] for k, v in data.items()}
         m = len(b["hist_feat"])
         tot += batch_loss(model, b, tc["rollout_weight"], tc["huber_delta"]).item() * m
-        out = model.rollout(b["hist_feat"], b["hist_act"], b["hist_dt"], b["fut_act"], b["fut_dt"], terrain_map=b.get("terrain_map"))
+        out = model.rollout(b["hist_feat"], b["hist_act"], b["hist_dt"], b["fut_act"], b["fut_dt"], terrain_map=b.get("terrain_map"),
+                            context=b.get("context"))
         pos_err += (out["poses"][:, -1, :2] - b["fut_pose"][:, -1, :2]).norm(dim=-1).sum().item()
     return {"loss": tot / n, "final_pos_err_m": pos_err / n}
 
@@ -67,13 +70,20 @@ def train(cfg: dict[str, Any], data_root: str | Path, out_dir: str | Path, log: 
     uses_t = getattr(MODEL_TYPES.get(cfg["model"]["type"]), "uses_terrain", False)
     src = cfg["model"].get("terrain_source", "analytic") if uses_t else None
     scan, sensor = src == "scan", bool(src and src.startswith("sensor:"))
-    wkw = dict(terrain_map=src == "analytic", terrain_scan=scan, terrain_sensors=(src,) if sensor else ())
+    uses_c = getattr(MODEL_TYPES.get(cfg["model"]["type"]), "uses_context", False)
+    ckeys = tuple(cfg["model"].get("context_keys") or ()) if uses_c else ()
+    wkw = dict(terrain_map=src == "analytic", terrain_scan=scan, terrain_sensors=(src,) if sensor else (),
+               context_keys=ckeys)
     w_tr = build_windows(train_eps, K, H, dc.get("stride", 1), **wkw)
     w_va = build_windows(val_eps, K, H, dc.get("stride", 1), **wkw)
     if scan:  # the model reads `terrain_map`; feed it the scanner-built map
         w_tr.terrain_map, w_va.terrain_map = w_tr.terrain_map_scan, w_va.terrain_map_scan
     if sensor:
         w_tr.terrain_map, w_va.terrain_map = w_tr.terrain_map_sensor[src], w_va.terrain_map_sensor[src]
+    if ckeys:
+        for w_ in (w_tr, w_va):
+            w_.context = np.concatenate([w_.context_feats[k] for k in ckeys], 1)
+        cfg["model"]["context_dim"] = int(w_tr.context.shape[1])
     log(f"[train] device={device} train: {len(train_eps)} eps / {len(w_tr)} windows, val: {len(val_eps)} eps / {len(w_va)} windows")
 
     model = build_model(cfg)

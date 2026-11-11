@@ -1,0 +1,5 @@
+# E5 (option C): pretrained monocular depth (Depth Anything V2, flat-ground calibrated) from the front RGB camera.
+# See scripts/rgb_depth_maps.py; fused over 10 frames like the range sensors.
+_base_: world_model_e4_terrain_gru.yaml
+model:
+  terrain_source: "sensor:rgbdacal@10"

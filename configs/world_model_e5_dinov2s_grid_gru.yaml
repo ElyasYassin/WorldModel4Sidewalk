@@ -1,0 +1,6 @@
+# E5 (option A1): GRU + frozen pretrained image features of the front camera at the window start (data/go2_e4c_train).
+# DINOv2-small patch tokens pooled to 2 x 2 (near/far x left/right; 1536-d).
+_base_: world_model_e4_gru.yaml
+model:
+  type: image_gru
+  context_keys: [feat_dinov2s_grid]

@@ -36,6 +36,7 @@ class DynamicsBase(nn.Module):
     model_type = "base"
     learned = True
     uses_terrain = False
+    uses_context = False  # start-frame image features (pretrained encoders), see ImageGRUDynamics
 
     def __init__(self, history: int, feat_dim: int = FEATURE_DIM, act_dim: int = ACTION_DIM, target_dim: int = TARGET_DIM):
         super().__init__()
@@ -63,6 +64,10 @@ class DynamicsBase(nn.Module):
         """Extra per-step input from the current predicted pose (terrain models); None otherwise."""
         return None
 
+    def _extra(self, pose: torch.Tensor, terrain_map: torch.Tensor | None, context: torch.Tensor | None):
+        """All extra per-step inputs; image models add their start-frame context here."""
+        return self._context(pose, terrain_map)
+
     def step_normalized(self, hist_feat, hist_act, hist_dt, act, dt, extra=None) -> torch.Tensor:
         """Returns normalized delta targets [B, T]."""
         return self._step_norm(
@@ -79,7 +84,7 @@ class DynamicsBase(nn.Module):
         return self.target_norm.inverse(self.step_normalized(hist_feat, hist_act, hist_dt, act, dt))
 
     def rollout(self, hist_feat, hist_act, hist_dt, fut_act, fut_dt, return_normalized: bool = False,
-                terrain_map: torch.Tensor | None = None) -> dict[str, torch.Tensor]:
+                terrain_map: torch.Tensor | None = None, context: torch.Tensor | None = None) -> dict[str, torch.Tensor]:
         """Open-loop autoregressive rollout.
 
         hist_feat [B,K,F], hist_act [B,K,A], hist_dt [B,K], fut_act [B,H,A], fut_dt [B,H]
@@ -91,7 +96,7 @@ class DynamicsBase(nn.Module):
         hf, ha, hd = hist_feat, hist_act, hist_dt
         for h in range(H):
             a, dt = fut_act[:, h], fut_dt[:, h]
-            dn = self.step_normalized(hf, ha, hd, a, dt, self._context(pose, terrain_map))
+            dn = self.step_normalized(hf, ha, hd, a, dt, self._extra(pose, terrain_map, context))
             d = self.target_norm.inverse(dn)
             new_feat = hf[:, -1] + d[:, FEAT0:]
             pose = compose_se2_torch(pose, d[:, [DX, DY, DYAW]])
@@ -253,8 +258,79 @@ class TerrainGRUDynamics(GRUDynamics):
         return self.head(torch.cat([h[-1], a, dt, extra], dim=-1))
 
 
+class _ImageContextMixin:
+    """Start-frame image features from a frozen pretrained encoder (E5, option A1), e.g. DINOv2 CLS/mean/grid
+    tokens of the front camera at the window start. They are standardized, dropped out, projected to
+    `ctx_hidden` units and appended to the GRU head input at every rollout step (the image is not re-rendered
+    along the rollout: it is context, not a predicted quantity)."""
+
+    uses_context = True
+
+    def _init_context(self, context_keys, context_dim: int, ctx_hidden: int, ctx_dropout: float) -> None:
+        if not context_keys or context_dim <= 0:
+            raise ValueError("image models need model.context_keys (training fills in context_dim)")
+        self.context_keys, self.context_dim = list(context_keys), int(context_dim)
+        self.ctx_hidden, self.ctx_dropout = int(ctx_hidden), float(ctx_dropout)
+        self.ctx_norm = Normalizer(self.context_dim)
+        self.ctx_proj = nn.Sequential(nn.Dropout(self.ctx_dropout), nn.Linear(self.context_dim, self.ctx_hidden), nn.SiLU())
+
+    def _context_kwargs(self):
+        return {"context_keys": self.context_keys, "context_dim": self.context_dim, "ctx_hidden": self.ctx_hidden,
+                "ctx_dropout": self.ctx_dropout}
+
+    def fit_normalizers(self, w) -> None:
+        super().fit_normalizers(w)
+        self.ctx_norm.fit(w.context)
+
+    def _ctx(self, context, like):
+        if context is None:
+            raise ValueError(f"{self.model_type} needs context ({self.context_keys})")
+        return self.ctx_proj(self.ctx_norm(context.to(like.dtype)))
+
+
+class ImageGRUDynamics(_ImageContextMixin, GRUDynamics):
+    """GRU + start-frame image features (no terrain map)."""
+
+    model_type = "image_gru"
+
+    def __init__(self, history: int, hidden: int = 128, layers: int = 1, context_keys=(), context_dim: int = 0,
+                 ctx_hidden: int = 64, ctx_dropout: float = 0.1, **kw):
+        super().__init__(history, hidden, layers, **kw)
+        self._init_context(context_keys, context_dim, ctx_hidden, ctx_dropout)
+        self.head[0] = nn.Linear(hidden + self.act_dim + 1 + self.ctx_hidden, hidden)
+
+    def kwargs(self):
+        return {**GRUDynamics.kwargs(self), **self._context_kwargs()}
+
+    def _extra(self, pose, terrain_map, context):
+        return self._ctx(context, pose)
+
+    def _step_norm(self, hf, ha, hd, a, dt, extra=None):
+        _, h = self.gru(torch.cat([hf, ha, hd], dim=-1))
+        return self.head(torch.cat([h[-1], a, dt, extra], dim=-1))
+
+
+class ImageTerrainGRUDynamics(_ImageContextMixin, TerrainGRUDynamics):
+    """Terrain GRU (patch at each predicted pose) + start-frame image features."""
+
+    model_type = "image_terrain_gru"
+
+    def __init__(self, history: int, hidden: int = 128, layers: int = 1, terrain_source: str = "analytic",
+                 context_keys=(), context_dim: int = 0, ctx_hidden: int = 64, ctx_dropout: float = 0.1, **kw):
+        super().__init__(history, hidden, layers, terrain_source=terrain_source, **kw)
+        self._init_context(context_keys, context_dim, ctx_hidden, ctx_dropout)
+        self.head[0] = nn.Linear(hidden + self.act_dim + 1 + self.patch_dim + self.ctx_hidden, hidden)
+
+    def kwargs(self):
+        return {**TerrainGRUDynamics.kwargs(self), **self._context_kwargs()}
+
+    def _extra(self, pose, terrain_map, context):
+        return torch.cat([self._context(pose, terrain_map), self._ctx(context, pose)], -1)
+
+
 MODEL_TYPES = {"mlp": MLPDynamics, "gru": GRUDynamics, "terrain_mlp": TerrainMLPDynamics,
-               "terrain_gru": TerrainGRUDynamics}
+               "terrain_gru": TerrainGRUDynamics, "image_gru": ImageGRUDynamics,
+               "image_terrain_gru": ImageTerrainGRUDynamics}
 
 
 def build_model(cfg: dict[str, Any]) -> DynamicsBase:
