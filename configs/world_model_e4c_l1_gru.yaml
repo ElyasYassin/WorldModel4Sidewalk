@@ -1,0 +1,5 @@
+# E4-C data (data/go2_e4c_train, same tiles/seeds as E4-S): which sensor's terrain map helps prediction?
+# Single-frame l1 elevation grid -> map (see go2wm.models.terrain_map.sensor_maps).
+_base_: world_model_e4_terrain_gru.yaml
+model:
+  terrain_source: "sensor:l1"

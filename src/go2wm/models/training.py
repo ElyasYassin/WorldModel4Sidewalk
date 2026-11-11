@@ -65,11 +65,15 @@ def train(cfg: dict[str, Any], data_root: str | Path, out_dir: str | Path, log: 
     from .state_dynamics import MODEL_TYPES
 
     uses_t = getattr(MODEL_TYPES.get(cfg["model"]["type"]), "uses_terrain", False)
-    scan = uses_t and cfg["model"].get("terrain_source", "analytic") == "scan"
-    w_tr = build_windows(train_eps, K, H, dc.get("stride", 1), terrain_map=uses_t and not scan, terrain_scan=scan)
-    w_va = build_windows(val_eps, K, H, dc.get("stride", 1), terrain_map=uses_t and not scan, terrain_scan=scan)
+    src = cfg["model"].get("terrain_source", "analytic") if uses_t else None
+    scan, sensor = src == "scan", bool(src and src.startswith("sensor:"))
+    wkw = dict(terrain_map=src == "analytic", terrain_scan=scan, terrain_sensors=(src,) if sensor else ())
+    w_tr = build_windows(train_eps, K, H, dc.get("stride", 1), **wkw)
+    w_va = build_windows(val_eps, K, H, dc.get("stride", 1), **wkw)
     if scan:  # the model reads `terrain_map`; feed it the scanner-built map
         w_tr.terrain_map, w_va.terrain_map = w_tr.terrain_map_scan, w_va.terrain_map_scan
+    if sensor:
+        w_tr.terrain_map, w_va.terrain_map = w_tr.terrain_map_sensor[src], w_va.terrain_map_sensor[src]
     log(f"[train] device={device} train: {len(train_eps)} eps / {len(w_tr)} windows, val: {len(val_eps)} eps / {len(w_va)} windows")
 
     model = build_model(cfg)

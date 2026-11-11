@@ -1,0 +1,2 @@
+# E4-C data (data/go2_e4c_train, same tiles/seeds as E4-S): which sensor's terrain map helps prediction?
+_base_: world_model_e4_gru.yaml

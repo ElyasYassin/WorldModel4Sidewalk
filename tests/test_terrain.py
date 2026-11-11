@@ -195,3 +195,19 @@ def test_generator_tile_origins_match_isaac_layout():
     # observed in Isaac Lab 2.3 (terrain_origins) for the 6 E4 test tiles of 28 x 8 m
     want = [[0.0, -20.0], [0.0, -12.0], [0.0, -4.0], [0.0, 4.0], [0.0, 12.0], [0.0, 20.0]]
     np.testing.assert_allclose(generator_tile_origins_xy(6, (28.0, 8.0)), want)
+
+
+def test_sensor_maps_resample_fill_and_reference():
+    from go2wm.models.terrain_map import MAP_X, MAP_Y, sensor_maps
+    from go2wm.sim.sensors import GRID_SHAPE, grid_centres
+
+    cx, cy = grid_centres()
+    X, _ = np.meshgrid(cx, cy, indexing="ij")
+    elev = np.where(X > 0.5, 0.10, 0.02).astype(np.float16)[None]  # a 8 cm step at x = 0.5 m, ground at 2 cm
+    elev[0, X < 0.3] = np.nan  # unobserved under/behind the robot
+    m = sensor_maps(elev, np.array([0.02]))
+    assert m.shape == (1, len(MAP_Y), len(MAP_X)) and np.isfinite(m).all()
+    ix = lambda x: int(np.argmin(np.abs(MAP_X - x)))  # noqa: E731
+    assert abs(m[0, 12, ix(1.0)] - 0.08) < 1e-3 and abs(m[0, 12, ix(0.4)]) < 1e-3
+    assert abs(m[0, 12, ix(-0.5)]) < 1e-3  # filled from the nearest observed (flat) ground
+    assert np.all(sensor_maps(np.full((1, *GRID_SHAPE), np.nan, np.float16), np.zeros(1)) == 0)

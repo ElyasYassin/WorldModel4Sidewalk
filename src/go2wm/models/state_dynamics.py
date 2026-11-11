@@ -209,7 +209,7 @@ class TerrainMLPDynamics(MLPDynamics):
         from .terrain_map import PATCH_DIM
 
         super().__init__(history, hidden, layers, **kw)
-        assert terrain_source in ("analytic", "scan"), terrain_source
+        assert terrain_source in ("analytic", "scan") or terrain_source.startswith("sensor:"), terrain_source
         self.terrain_source = terrain_source  # analytic = perfect tile geometry; scan = robot's height scanner
         self.patch_dim = PATCH_DIM
         d_in = history * (self.feat_dim + self.act_dim + 1) + self.act_dim + 1 + PATCH_DIM
@@ -236,7 +236,7 @@ class TerrainGRUDynamics(GRUDynamics):
         from .terrain_map import PATCH_DIM
 
         super().__init__(history, hidden, layers, **kw)
-        assert terrain_source in ("analytic", "scan"), terrain_source
+        assert terrain_source in ("analytic", "scan") or terrain_source.startswith("sensor:"), terrain_source
         self.terrain_source = terrain_source
         self.patch_dim = PATCH_DIM
         self.head[0] = nn.Linear(hidden + self.act_dim + 1 + PATCH_DIM, hidden)

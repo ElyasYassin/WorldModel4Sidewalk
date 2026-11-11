@@ -612,3 +612,58 @@ lateral commands. It stands still for small planar commands, including all turn-
 - Beyond that, these runs show **the learned model has no navigation advantage on flat ground with cylinders**: every planner difference is
   explained by locomotion deadband and cost tuning. Testing H1/H2 needs conditions where dynamics are hard to model by hand: sidewalk
   terrain (curbs, slopes, friction changes, from SidewalkAtlas `scripts/terrain`), and cameras with V-JEPA 2 for H1.
+
+## E4-C (1): sensor map accuracy (2026-11-11)
+
+- **Data.** Full E4-C collection with the sensor rig: 144 train episodes (12 tiles, seeds 70000+) and 48 final-test
+  episodes (6 unseen tiles, seeds 80000+), `data/go2_e4c_{train,test}`. Results below are on the 48 test episodes.
+- **Method.** `python scripts/evaluate_sensors.py --data data/go2_e4c_test --out outputs/e4c/test`.
+  - Ground truth: the terrain mesh. Cells within 7.5 cm of slab edges or the curb are excluded from the elevation
+    metrics. Poses are simulator truth.
+  - Fusion: the last K frames with perfect registration, plus a per-frame vertical registration error σ_reg (a
+    sensitivity check, not an odometry model).
+  - Joint steps: a plane fit each side of every transverse joint within one frame, scored against the ADA classes.
+  - Sanity: median signed error is +0.07 to +0.11 cm for every sensor, so frames and ground truth line up.
+- **Single frame, p90 |height error| (cm) / coverage, by distance ahead.**
+
+| sensor | p90 < 1 cm range | 0.3–0.8 m | 0.8–1.5 m | 1.5–2.5 m | 2.5–3.5 m |
+|---|---|---|---|---|---|
+| D555-like | 0.6–2.9 m | 0.48 / 14 % | 0.50 / 70 % | 0.65 / 47 % | 1.04 / 16 % |
+| D435-like | 0.6–2.1 m | 0.50 / 15 % | 0.55 / 70 % | 0.93 / 49 % | 1.74 / 17 % |
+| L1-like | none (1.0 cm at 1.5–2.5 m) | 1.60 / 50 % | 1.35 / 20 % | 1.01 / 5 % | 1.34 / 1 % |
+| Mid-360, tilted 30° | none | 1.41 / 18 % | 1.08 / 60 % | 0.98 / 34 % | 1.03 / 13 % |
+| Mid-360, upright | none | (1 % coverage) | 1.42 / 1 % | 1.10 / 1 % | 1.72 / 1 % |
+| D555 + L1 | – | 1.42 / 54 % | 0.54 / 74 % | 0.67 / 49 % | 1.03 / 17 % |
+
+- **Fusion over K frames** (p90 cm at 0.8–1.5 m / 1.5–2.5 m; σ_reg = 0 → 5 mm):
+  - D555, K = 10: 0.47 / 0.54, rising to 0.58 / 0.76. Coverage 83 % / 84 %.
+  - L1 needs K = 10–20 to reach 0.8–0.9 cm, and coverage beyond 1.5 m stays 27–37 %.
+  - Tilted Mid-360, K = 20: 0.59 / 0.62, rising to 0.68 / 0.81.
+  - Registration error at 5 mm per frame costs the depth camera about 0.1–0.2 cm at p90.
+- **Joint step height** (single frame; violation = step > 13 mm):
+
+| sensor | joints at | p90 err | ADA class agree | violation recall | false flags on flush joints |
+|---|---|---|---|---|---|
+| D555 | 0.5–1.5 m | 2.1 mm | 99 % | 99 % | 0 % |
+| D555 | 1.5–2.5 m | 5.7 mm | 98 % | 97 % | 1 % |
+| D435 | 1.5–2.5 m | 12.6 mm | 96 % | 96 % | 4 % |
+| D435 | 2.5–3.2 m | 35.9 mm | 85 % | 96 % | 21 % |
+| L1 | 0.5–1.5 m | 10.9 mm | 89 % | 99 % | 19 % |
+| Mid-360 tilted | 0.5–1.5 m | 15.9 mm | 95 % | 99 % | 7 % |
+
+- **Findings.**
+  - Only the depth cameras meet the < 1 cm requirement in a single frame, and only from 0.6 m out to 2.1 m (D435)
+    or 2.9 m (D555). The D555's wider baseline is what makes the difference beyond 1.5 m: about 3× lower joint-step
+    error there, and 1 % vs 4 % false flags.
+  - The depth cameras are blind closer than about 0.5 m (14–15 % coverage at 0.3–0.8 m). The L1 covers that zone
+    (50 %) but at 1.6 cm p90, so a D555 + L1 pair gives the best coverage near the feet, but not < 1 cm there in
+    one frame.
+  - The LiDARs (2 cm range noise) reach p90 ≈ 1 cm only by averaging many hits, i.e. fusing 10–20 frames. Even
+    then the L1's sparse coverage leaves 19–29 % false flags on flush joints. They are fine for detecting
+    violations (recall 97–99 %) but not for measuring steps to ADA precision.
+  - An upright Mid-360 on the back is useless for the ground near the robot (1 % coverage).
+- **Caveats.** These are approximate device models: Gaussian range noise, random dropout, no multipath, no
+  sunlight, no reflectance effects, and no body occlusion beyond what the rays hit. The depth noise model is the
+  main assumption; a real D555 outdoors will likely be worse. Registration is perfect apart from the σ_reg
+  sensitivity check. The upright Mid-360's 44 cm p90 at 0.3–0.8 m comes from about 1 % of cells, so it is not
+  meaningful.

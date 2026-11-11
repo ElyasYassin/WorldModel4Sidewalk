@@ -28,7 +28,9 @@ def _rollout_np(model: DynamicsBase, w: WindowArrays, device: torch.device, bs: 
     outs: dict[str, list] = {"poses": [], "deltas": []}
     for i in range(0, len(w), bs):
         t = lambda a: torch.as_tensor(a[i : i + bs], device=device)  # noqa: E731
-        src = w.terrain_map_scan if getattr(model, "terrain_source", "analytic") == "scan" else w.terrain_map
+        ts = getattr(model, "terrain_source", "analytic")
+        src = (w.terrain_map_scan if ts == "scan"
+               else (w.terrain_map_sensor or {}).get(ts) if ts.startswith("sensor:") else w.terrain_map)
         tm = t(src) if (model.uses_terrain and src is not None) else None
         o = model.rollout(t(w.hist_feat), t(w.hist_act), t(w.hist_dt), t(w.fut_act), t(w.fut_dt), terrain_map=tm)
         outs["poses"].append(o["poses"].cpu().numpy())
@@ -102,7 +104,8 @@ def evaluate_models(
         steps = {h: s for h, s in steps.items() if s <= H}
     tm = [m for m in models.values() if getattr(m, "uses_terrain", False)]
     kw = dict(terrain_map=any(getattr(m, "terrain_source", "analytic") == "analytic" for m in tm),
-              terrain_scan=any(getattr(m, "terrain_source", "analytic") == "scan" for m in tm))
+              terrain_scan=any(getattr(m, "terrain_source", "analytic") == "scan" for m in tm),
+              terrain_sensors=tuple(sorted({m.terrain_source for m in tm if m.terrain_source.startswith("sensor:")})))
     w = build_windows(episodes, history, H, **kw)
     w1 = build_windows(episodes, history, 1, **kw)
     fams = np.array([episodes[i].meta.get("scene_family", "unknown") for i in w.episode_index])

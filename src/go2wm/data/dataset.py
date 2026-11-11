@@ -109,20 +109,24 @@ class WindowArrays:
     start_index: np.ndarray  # [N]
     terrain_map: np.ndarray | None = None  # [N, NY, NX] start-frame height map (terrain models only)
     terrain_map_scan: np.ndarray | None = None  # same grid, built from the robot's height scan
+    terrain_map_sensor: dict | None = None  # {"sensor:<name>": maps} from E4-C sensor elevation grids
 
     def __len__(self) -> int:
         return len(self.hist_feat)
 
 
 def build_windows(episodes: list[Episode], history: int, horizon: int, stride: int = 1,
-                  terrain_map: bool = False, terrain_scan: bool = False) -> WindowArrays:
+                  terrain_map: bool = False, terrain_scan: bool = False,
+                  terrain_sensors: tuple[str, ...] = ()) -> WindowArrays:
     """Windows never cross episode boundaries; history needs K prior transitions.
     terrain_map=True adds a start-frame height map per window from the tile geometry (zeros on flat
-    ground); terrain_scan=True adds the same map built from the height scan at the window start."""
+    ground); terrain_scan=True adds the same map built from the height scan at the window start;
+    terrain_sensors=("sensor:depth_d555", ...) adds maps from those E4-C sensors' single-frame grids."""
     K, H = history, horizon
     out: dict[str, list] = {k: [] for k in WindowArrays.__dataclass_fields__ if not k.startswith("terrain_map")}
     maps: list[np.ndarray] = []
     smaps: list[np.ndarray] = []
+    sens: dict[str, list] = {k: [] for k in terrain_sensors}
     for ei, ep in enumerate(episodes):
         S = ep["states"]
         C = ep["commands"][:, :ACTION_DIM]
@@ -158,6 +162,23 @@ def build_windows(episodes: list[Episode], history: int, horizon: int, stride: i
                     smaps.append(np.zeros((len(idx), len(MAP_Y), len(MAP_X)), np.float32))  # flat / no scanner
                 else:
                     smaps.append(scan_maps(ep["scan_height_m"][idx], np.asarray(pat)))
+        if terrain_sensors:
+            from ..models.terrain_map import MAP_X, MAP_Y, sensor_maps
+
+            idx = np.arange(K, T - H + 1, stride)
+            if len(idx):
+                for k in terrain_sensors:
+                    arr = f"sensor_{k.split(':', 1)[1]}_elev_m"
+                    if arr not in ep.arrays:
+                        sens[k].append(np.zeros((len(idx), len(MAP_Y), len(MAP_X)), np.float32))
+                    else:
+                        # ground under the base in the sensor (tile-surface) frame. gt_ground_z_m is in a frame
+                        # shifted by a per-tile constant, so it cannot be used directly.
+                        from ..models.terrain_map import episode_height_fn
+
+                        hfn = episode_height_fn(ep.meta)
+                        gz = hfn(pose[idx, 0], pose[idx, 1]) if hfn is not None else np.zeros(len(idx))
+                        sens[k].append(sensor_maps(ep[arr][idx], gz))
     if not out["hist_feat"]:
         raise ValueError(f"no windows (history={K}, horizon={H}); episodes too short?")
     w = WindowArrays(**{k: np.asarray(v, dtype=np.float32 if k not in ("episode_index", "start_index") else np.int64) for k, v in out.items()})
@@ -165,6 +186,8 @@ def build_windows(episodes: list[Episode], history: int, horizon: int, stride: i
         w.terrain_map = np.concatenate(maps).astype(np.float32)
     if terrain_scan:
         w.terrain_map_scan = np.concatenate(smaps).astype(np.float32)
+    if terrain_sensors:
+        w.terrain_map_sensor = {k: np.concatenate(v).astype(np.float32) for k, v in sens.items()}
     return w
 
 

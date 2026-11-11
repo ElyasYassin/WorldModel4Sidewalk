@@ -77,6 +77,48 @@ def scan_maps(scans: np.ndarray, pattern_xy: np.ndarray) -> np.ndarray:
     return (bilinear(gx, gy) - z0[:, None, None]).astype(np.float32)
 
 
+def sensor_maps(elev: np.ndarray, ground_z: np.ndarray, fill_iters: int = 60) -> np.ndarray:
+    """E4-C sensor elevation grids [N, nx, ny] (5 cm cells of go2wm.sim.sensors.ELEV_GRID, terrain-frame
+    heights, NaN where empty) -> maps [N, len(MAP_Y), len(MAP_X)] on the MAP grid, heights relative to
+    the ground under the base (ground_z [N], same frame as the grids; simulator truth here, standing in
+    for the foot-contact height a real robot gets from leg kinematics).
+
+    Each MAP point averages the (up to 2 x 2) observed cells around it. Unobserved points take the mean
+    of observed neighbours, grown outward iteratively (so, like the scanner map, values near the edge
+    of what the sensor saw are held); points with no observation within reach are 0 (flat)."""
+    from ..sim.sensors import ELEV_GRID, grid_centres
+
+    cx, cy = grid_centres(ELEV_GRID)
+    e = np.asarray(elev, dtype=np.float32)
+    n = len(e)
+    acc = np.zeros((n, len(MAP_Y), len(MAP_X)), np.float32)
+    cnt = np.zeros_like(acc)
+    for dx in (-0.025, 0.025):
+        ix = np.round((MAP_X + dx - cx[0]) / ELEV_GRID["res"]).astype(int)
+        okx = (ix >= 0) & (ix < len(cx))
+        for dy in (-0.025, 0.025):
+            iy = np.round((MAP_Y + dy - cy[0]) / ELEV_GRID["res"]).astype(int)
+            oky = (iy >= 0) & (iy < len(cy))
+            sub = np.full((n, len(MAP_Y), len(MAP_X)), np.nan, np.float32)
+            sub[:, np.ix_(oky, okx)[0], np.ix_(oky, okx)[1]] = e[:, ix[okx]][:, :, iy[oky]].transpose(0, 2, 1)
+            fin = np.isfinite(sub)
+            acc += np.where(fin, sub, 0)
+            cnt += fin
+    with np.errstate(invalid="ignore", divide="ignore"):
+        m = np.where(cnt > 0, acc / np.maximum(cnt, 1), np.nan)
+    for _ in range(fill_iters):
+        miss = ~np.isfinite(m)
+        if not miss.any():
+            break
+        p = np.pad(m, ((0, 0), (1, 1), (1, 1)), constant_values=np.nan)
+        nb = np.stack([p[:, :-2, 1:-1], p[:, 2:, 1:-1], p[:, 1:-1, :-2], p[:, 1:-1, 2:]])
+        f = np.isfinite(nb)
+        s, c = np.where(f, nb, 0).sum(0), f.sum(0)
+        m = np.where(miss & (c > 0), s / np.maximum(c, 1), m)
+    m = np.where(np.isfinite(m), m - np.asarray(ground_z, np.float32)[:, None, None], 0.0)
+    return m.astype(np.float32)
+
+
 def sample_patch(maps: torch.Tensor, pose: torch.Tensor) -> torch.Tensor:
     """maps [B, NY, NX], pose [B, 3] relative to the start pose -> patch features [B, PATCH_DIM]."""
     B = maps.shape[0]

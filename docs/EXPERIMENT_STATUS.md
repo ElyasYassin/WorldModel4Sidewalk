@@ -5,7 +5,7 @@ Artifact paths are under the data root `D:/go2wm` (`configs/paths.yaml`). Every 
 **simulation** (Isaac Lab Go2, pretrained flat-terrain policy, flat ground, cylinder obstacles)
 unless marked mock. Nothing has run on hardware.
 
-Updated 2026-11-10.
+Updated 2026-11-11.
 
 ## Evaluation roles (frozen, `configs/eval_protocol.yaml`)
 
@@ -46,6 +46,7 @@ geometry with any data episode.
 | E4-P2b | Terrain GRU, weight decay, commanded-path segment labels | Unseen tiles: terrain GRU best (3 s 0.165 vs GRU 0.184, MLP 0.195, terrain MLP 0.181 m); terrain MLPs degrade on unseen grades; stall windows now labelled step (kinematics 0.64 m there) | dev-test picked a different model; perfect map; prediction only | `outputs/e4_p2b/final_test/prediction_metrics.json` |
 | P4-a | Ground-truth sidewalk scene graph (inspection + mission grounding) | Per test tile 34–43 nodes, 7–11 hazards (1–6 ADA violations); JSON + text + figure | risk is a heuristic placeholder; no sensor-built graph yet | `outputs/scene_graphs/` |
 | E4-C setup | Which sensor sees the sidewalk? (rig smoke test, 2 episodes) | Ground coverage 0.3–2 m ahead per frame: depth 66–71 %, Mid-360 tilted 43–50 %, L1 39–40 %, Mid-360 upright 0–1 %; errors ≤ 2 cm p90 | 2 episodes; full collection running | `data/go2_e4c_smoke` |
+| E4-C (1) | Sensor map accuracy, 48 test eps on unseen tiles | Only depth cameras meet < 1 cm in one frame (D555 p90 ≤ 1 cm at 0.6–2.9 m, D435 0.6–2.1 m); D555 joint steps p90 2–6 mm to 2.5 m, ADA class 98–99 %. LiDARs ≈ 1–1.6 cm single frame, need 10–20-frame fusion; upright Mid-360 sees 1 % of near ground | approximate noise models, no sunlight/multipath; perfect registration except σ_reg check | `outputs/e4c/test/` |
 | E4-S | Does the terrain gain survive on the robot's own height scanner (0.8 m reach) instead of a perfect 3 m map? (fresh E4 re-collection, 3 models × 3 seeds) | E4-P2b replicates (3 s: GRU 0.184, map 0.165 m). Scanner 0.176 m: on unseen-tile steps it keeps ~70 % of the map's gain at 2 s, ~40 % at 3 s | dev-test scanner gain within noise; noise-free, unoccluded scanner; single-frame scan; prediction only | `outputs/e4s/final_test/prediction_metrics.json` |
 
 Main findings so far: on flat ground, better prediction does not change navigation outcomes;
