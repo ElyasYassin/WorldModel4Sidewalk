@@ -523,6 +523,89 @@ lateral commands. It stands still for small planar commands, including all turn-
   and test tiles (E4-P2) still applies. Prediction only, no navigation test. Gains are small in absolute terms
   (1–4 cm on a 0.18–0.29 m error).
 
+## Sidewalk appearance (rendering only, 2026-11-10)
+
+- **Problem.** The rough task gives the terrain a white marble-tile material, and every tile was one surface, so
+  camera views showed no sidewalk.
+- **Change.** `go2wm.sim.sidewalk_texture.sidewalk_albedo` paints the same tile parameters as the geometry:
+  - concrete panels with tooled joints every 1.5 m and a centre joint, per-panel tint, wear and hairline cracks;
+  - heaved slabs in older concrete;
+  - beyond a curb: curb top, gutter pan, asphalt with an edge line; otherwise grass with dirt patches.
+
+  `go2wm.sim.isaac_texture` bakes it into one PNG over the merged terrain mesh (2 cm/px, cached in
+  `D:/go2wm/cache/textures`). It is applied as the terrain's visual material while the mesh is created
+  (`isaac.terrain_texture`). The 2D replays (`draw_sidewalk`, now in `go2wm.eval.plots`) use the same painter.
+  Physics and collision are unchanged.
+- **Pitfalls found.**
+  - Swapping the material after the scene exists left tiled-camera frames all black in about 2 of 3 launches.
+    Creating it with the mesh fixed this (3/3 launches).
+  - With the onboard camera on, anti-aliasing is set to FXAA: DLSS renders a 224 px camera at ~130 px, below its
+    300 px minimum.
+  - The viewport video renderer sometimes returns black frames on a first run, so frames are re-grabbed.
+- Videos: `D:/go2wm/outputs/videos/09_e4_cam_textured_{climb_80001,stall_80037,fall_80007}.mp4`.
+
+## P4-a: ground-truth sidewalk scene graph (2026-11-10)
+
+- **Purpose.** One graph for two uses:
+  - inspection: an inventory of hazards with ADA checks;
+  - mission grounding for the voice / HITL layer: named regions and landmarks, plus keep-out boxes for
+    high-risk features.
+
+  Built from the tile parameters, so it is exact ground truth (`go2wm.scene.graph`, `scripts/scene_graph.py`).
+- **Nodes.**
+  - Regions: walkway, verges, road.
+  - Features: slabs, ramps, curb.
+  - Panels between joints, two rows on walks ≥ 2 m wide.
+  - Cracks: the same polylines the texture paints, so an RGB sensor can be scored on them.
+  - Landmarks: start, end.
+- **Edges.** `part_of`, `next` (with the joint step in metres and its ADA class), `beside`, `covers`, `spans`,
+  `on`, `borders`.
+- **Hazards.**
+  - Vertical displacement per joint line (ADA 303: ≤ 6.4 mm ok, ≤ 13 mm bevel, above = violation).
+  - Running slope (403.3: > 5 % is a ramp, > 8.33 % violation) and cross slope (> 2.08 %).
+  - Curb drop-off and cracks.
+  - Each hazard carries a robot risk (low / medium / high). It comes from the E4-sweep thresholds (step ≥ 15 cm,
+    grade ≥ 28 % high) and is a placeholder for a world-model stall probability.
+- **Output.** JSON, a text description (input for an LLM mission compiler) and a figure per tile in
+  `D:/go2wm/outputs/scene_graphs/`.
+  - Test tiles: 34–43 nodes and 70–105 edges each.
+  - Hazards per tile: 7–11, of which 1–6 are ADA violations.
+- **Not yet.** A sensor-built graph scored against this one (hazard recall per sensor), and risk from the world model.
+
+## E4-C setup: sensor comparison rig (2026-11-10)
+
+- **Sensors** (`go2wm.sim.sensors`; approximate device models, recorded together in one collection so they see
+  the same episodes):
+
+| sensor | model | mount | FOV / rays per 0.1 s | range, noise |
+|---|---|---|---|---|
+| `depth_d435` | RealSense D435-like | head, 30° down | 87 × 58°, 106 × 60 | 0.2–4 m, σ = 2 mm + 5 mm·z², 3 % dropout |
+| `depth_d555` | RealSense D555-like (95 mm baseline) | same as D435 | 87 × 58°, 106 × 60 | 0.52–6 m, σ = 2 mm + 2.5 mm·z², 3 % dropout |
+| `l1` | Unitree L1-like (stock Go2) | chin, dome axis forward 15° down | 360 × 90° dome, 2160 random | 0.05–30 m, σ 2 cm |
+| `mid360` | Livox Mid-360-like | back, upright | 360° × (−7°, +52°), 20 k random | 0.1–40 m, σ 2 cm |
+| `mid360_tilt` | same | back, 30° forward | same | same |
+| `scan_height_m` | the policy's height scanner | – | 1.6 × 1.0 m grid, 187 | noise-free |
+| RGB | Go2 front camera-like | head, 10° down | 224 × 224, 100° | MP4 per episode |
+
+- **Implementation.**
+  - Range sensors are Isaac ray casters whose rays are set in the base frame. The LiDARs get fresh random
+    directions every frame, which mimics their non-repetitive scan pattern.
+  - Hits are corrupted (range limits, dropout, noise), then binned into a robot-centred, yaw-aligned 5 cm grid
+    (x −1 to 3.5 m, y ±1.25 m): mean height in the terrain frame plus hit count.
+  - Arrays: `sensor_<name>_elev_m` (float16) and `sensor_<name>_count` (uint8). RGB is `<episode>_rgb.mp4`.
+  - Raw point clouds would not fit on disk (25 GB free).
+- **Smoke test** (2 test episodes, per frame):
+  - Depth camera: 66–71 % of the ground 0.3–2 m ahead, p90 error 0.7–0.9 cm.
+  - Tilted Mid-360: 43–50 %, p90 1.0–1.3 cm. L1: 39–40 %, p90 1.5–1.8 cm.
+  - Upright Mid-360: 0–1 %. Its lowest beam (−7°) first meets the ground ~3.7 m away, so it is nearly blind to
+    terrain near the robot.
+  - Median error +0.1 to +0.2 cm for all sensors.
+  - Cost: 87 s per 300-step episode (about twice the plain collection) and ~4 MB per episode.
+- **Next.** Full collection `data/go2_e4c_{train,test}` (same tiles and seeds), then per sensor:
+  1. map accuracy and coverage, single frame and accumulated;
+  2. the prediction gain of a terrain GRU fed that sensor's map;
+  3. hazard recall against the ground-truth scene graph.
+
 ## Next experiments (Isaac)
 - P1: sidewalk terrain with the rough-terrain policy (`configs/isaac_go2_rough_e4s1.yaml`, `scripts/isaac_terrain_smoke.py`);
   needs the pretrained rough checkpoint.

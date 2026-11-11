@@ -33,6 +33,9 @@ def main(argv=None) -> int:
     ap.add_argument("--max-steps", type=int, default=300)
     ap.add_argument("--data", default=None)
     ap.add_argument("--record-scan", action="store_true", help="also record the full height-scanner grid (scan_height_m)")
+    ap.add_argument("--sensor-rig", nargs="*", default=None,
+                    help="E4-C range sensors to record as elevation grids (default with the flag: all of go2wm.sim.sensors)")
+    ap.add_argument("--rgb", action="store_true", help="record the front RGB camera (per-episode MP4; textured terrain)")
     args = ap.parse_args(argv)
     base_seed, default_data = SPLITS[args.split]
     with open(args.tiles, encoding="utf-8") as f:
@@ -41,6 +44,12 @@ def main(argv=None) -> int:
     c = cfg["isaac"]
     c.update(families=["sidewalk"], scene_obstacles=False, scene_bounds=[-1.0, 14.0, -3.5, 3.5], terrain_tiles=tiles,
              record_height_scan=args.record_scan)
+    if args.sensor_rig is not None:
+        from go2wm.sim.sensors import SENSOR_SPECS
+
+        c["sensor_rig"] = args.sensor_rig or list(SENSOR_SPECS)
+    if args.rgb:
+        c.update(rgb_camera=True, terrain_texture={"res": 0.02})
     cc = load_config("configs/isaac_go2.yaml")["collect"]
 
     from go2wm.data.recorder import collect_episodes

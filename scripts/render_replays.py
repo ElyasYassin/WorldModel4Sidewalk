@@ -26,6 +26,7 @@ import numpy as np  # noqa: E402
 from matplotlib.animation import FFMpegWriter  # noqa: E402
 
 from go2wm.common.config import resolve_path  # noqa: E402
+from go2wm.eval.plots import draw_sidewalk  # noqa: E402,F401  (moved; kept importable from here)
 
 COLORS = ["#2a6fdb", "#d9822b", "#2e9e5b", "#c23b5b", "#7a4fd0"]
 
@@ -51,67 +52,6 @@ def draw_scene(ax, sc: dict, robot_r: float = 0.3) -> None:
     ax.set_ylim(ymin - 0.3, ymax + 0.3)
     ax.set_aspect("equal")
     ax.tick_params(labelsize=7)
-
-
-def draw_sidewalk(ax, terrain: dict, xlim=(-2.0, 15.0), ylim=(-4.0, 4.0), res: float = 0.02) -> None:
-    """Top-down 'map' of a sidewalk tile: concrete walkway with score joints, grass verge, road and
-    curb (if the tile has a curb drop), hill-shaded from the true height field so slab edges, ramps
-    and cross-slope are visible, and labelled with the feature heights. Purely a visualisation of
-    the same geometry the simulator uses (go2wm.sim.terrain.sidewalk_height)."""
-    from go2wm.sim.terrain import params_with_defaults, sidewalk_height
-
-    t = params_with_defaults(terrain)
-    half = 0.5 * t["width"]
-    xs = np.arange(xlim[0], xlim[1], res)
-    ys = np.arange(ylim[0], ylim[1], res)
-    X, Y = np.meshgrid(xs, ys)
-    Z = sidewalk_height(X, Y, t)
-    rng = np.random.default_rng(0)
-    noise = rng.normal(0, 1, X.shape)
-    concrete = np.array([0.78, 0.77, 0.74])
-    grass = np.array([0.42, 0.60, 0.30])
-    asphalt = np.array([0.27, 0.27, 0.29])
-    granite = np.array([0.62, 0.62, 0.64])
-    img = np.empty(X.shape + (3,))
-    walk = np.abs(Y) <= half
-    road = (Y < -half) if t["curb_drop"] > 0 else np.zeros_like(walk)
-    img[:] = grass
-    img[road] = asphalt
-    img[walk] = concrete
-    for x0, length, h in t["slabs"]:  # lifted panels: slightly different (older) concrete
-        img[walk & (X >= x0) & (X < x0 + length)] = concrete * 0.94 + np.array([0.03, 0.02, 0.0])
-    if t["curb_drop"] > 0:  # granite curb stone along the walkway edge
-        img[(Y < -half + 0.15) & (Y >= -half)] = granite
-    img *= (1 + 0.035 * noise)[..., None]
-    img[(Y > half) | (~walk & ~road)] *= (1 + 0.06 * rng.normal(0, 1, X.shape))[(Y > half) | (~walk & ~road)][..., None]
-    # score joints every 1.5 m across the walkway, plus panel edges at slab boundaries
-    joints = set(np.round(np.arange(np.floor(xlim[0] / 1.5) * 1.5, xlim[1], 1.5), 3))
-    for x0, length, _ in t["slabs"]:
-        joints |= {round(x0, 3), round(x0 + length, 3)}
-    for xj in joints:
-        img[walk & (np.abs(X - xj) < res * 0.9)] *= 0.72
-    img[walk & (np.abs(np.abs(Y) - half) < res * 0.9)] *= 0.6
-    if t["curb_drop"] > 0:  # road edge line
-        lane = -half - 0.35
-        img[road & (np.abs(Y - lane) < 0.05) & ((X % 3.0) < 1.8)] = [0.93, 0.93, 0.90]
-    # hill shading from the height field, light from the upper left: ramps get a gentle tint,
-    # step edges (slab sides, curb) a sharp highlight/shadow line
-    gy, gx = np.gradient(Z, res)
-    shade = np.clip(1.0 + 0.6 * (-gx * 0.7 + gy * 0.7), 0.5, 1.4)
-    img = np.clip(img * shade[..., None], 0, 1)
-    ax.imshow(img, extent=(xs[0], xs[-1] + res, ys[0], ys[-1] + res), origin="lower", zorder=0, interpolation="bilinear")
-    lab = dict(fontsize=8, ha="center", va="center", zorder=3, bbox=dict(fc="white", ec="none", alpha=0.8, pad=1.5))
-    for k, (x0, length, h) in enumerate(t["slabs"]):
-        ax.text(x0 + 0.5 * length, half - 0.3 - 0.35 * (k % 2), f"slab +{h * 100:.0f} cm", **lab)
-    for x0, x1, rise in t["grade"]:
-        ax.annotate("", xy=(x1, half - 1.2), xytext=(x0, half - 1.2), zorder=3,
-                    arrowprops=dict(arrowstyle="->" if rise > 0 else "<-", color="k", lw=1.2))
-        ax.text(0.5 * (x0 + x1), half - 1.0, f"ramp {abs(rise) * 100:.0f} % {'up' if rise > 0 else 'down'}", **lab)
-    if t["curb_drop"] > 0:
-        ax.text(xlim[0] + 2.2, -half - 1.0, f"road  (curb drop {t['curb_drop'] * 100:.0f} cm)", **lab)
-    if abs(t["cross_slope"]) > 0.005:
-        ax.text(xlim[0] + 2.2, half + 0.35, f"cross-slope {t['cross_slope'] * 100:+.0f} % (left high)" if t["cross_slope"] > 0
-                else f"cross-slope {abs(t['cross_slope']) * 100:.0f} % (right high)", **lab)
 
 
 def load_runs(specs: list[str], scene: str) -> list[tuple[str, dict]]:
@@ -212,7 +152,8 @@ def render_pred(args) -> None:
     terrain = (sc.get("params") or {}).get("terrain")
     if terrain:  # the sidewalk as a top-down map (concrete, joints, verge, curb), hill-shaded by height
         draw_sidewalk(ax, terrain, xlim=(pose[:, 0].min() - 4, pose[:, 0].max() + 4),
-                      ylim=(pose[:, 1].min() - 3, pose[:, 1].max() + 3))
+                      ylim=(pose[:, 1].min() - 3, pose[:, 1].max() + 3),
+                      seed=int((sc.get("params") or {}).get("terrain_tile", 0)))  # Isaac texture seeds by tile index
     ax.plot(pose[:, 0], pose[:, 1], "-", color="#ddd", lw=1)
     trail, = ax.plot([], [], "-", color="k", lw=1.5)
     body = plt.Circle((0, 0), 0.3, fc="#ccc", ec="k")

@@ -29,6 +29,10 @@ def main(argv=None) -> int:
     ap.add_argument("--config", default="configs/isaac_go2_rough.yaml")
     ap.add_argument("--out", required=True)
     ap.add_argument("--fps", type=int, default=10, help="10 = real time at the 0.1 s control step")
+    ap.add_argument("--max-steps", type=int, default=None, help="stop after this many steps (quick looks)")
+    ap.add_argument("--eye", type=float, nargs=3, default=[-2.6, -1.1, 1.1], help="camera offset from the robot [m]")
+    ap.add_argument("--lookat", type=float, nargs=3, default=[1.6, 0.0, 0.0])
+    ap.add_argument("--still", default=None, help="also save the first frame as this PNG")
     args = ap.parse_args(argv)
 
     from go2wm.common.schema import VelocityCommand, state_pose2d
@@ -42,22 +46,35 @@ def main(argv=None) -> int:
     cfg = copy.deepcopy(load_config(args.config))
     c = cfg["isaac"]
     c.update(families=["sidewalk"], scene_obstacles=False, scene_bounds=[-1.0, 14.0, -3.5, 3.5], terrain_tiles=tiles,
-             enable_cameras=True, video={"resolution": [1280, 720], "eye": [-2.6, -1.1, 1.1], "lookat": [1.6, 0.0, 0.0]}, terrain_visual_color=[0.42, 0.41, 0.39])
+             enable_cameras=True, video={"resolution": [1280, 720], "eye": args.eye, "lookat": args.lookat}, terrain_texture={"res": 0.02})
 
     from go2wm.sim.isaac_go2 import IsaacGo2Adapter
 
     sim = IsaacGo2Adapter(cfg)
+
+    def grab():  # the renderer occasionally returns an all-black frame (seen on a first run); render again
+        f = sim.render_rgb()
+        for _ in range(4):
+            if np.asarray(f)[..., :3].mean() > 2:
+                break
+            f = sim.render_rgb()
+        return f
+
     seed = int(ep.meta["seed"])
     frames, poses = [], []
     try:
         obs = sim.reset(seed, ep.meta["scene_id"])
-        for _ in range(3):  # let the renderer warm up
-            frames.append(sim.render_rgb())
+        for _ in range(25):  # let the renderer warm up (the terrain texture streams in over ~10 frames)
+            frames.append(grab())
         frames = [frames[-1]]
         poses.append(state_pose2d(obs.state_vector()))
-        for k, cmd in enumerate(ep["commands"][:, :3]):
+        if args.still:
+            from PIL import Image
+
+            Image.fromarray(np.asarray(frames[0])[..., :3]).save(resolve_path(args.still))
+        for k, cmd in enumerate(ep["commands"][: args.max_steps, :3]):
             r = sim.step(VelocityCommand(float(cmd[0]), float(cmd[1]), float(cmd[2])))
-            frames.append(sim.render_rgb())
+            frames.append(grab())
             poses.append(state_pose2d(r.observation.state_vector()))
             if r.terminated:
                 break

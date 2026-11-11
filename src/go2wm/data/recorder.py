@@ -36,7 +36,8 @@ class EpisodeRecorder:
         # extra ground truth (gt_<k>) and sensor arrays (scan_*) declared in ARRAY_SPEC, recorded when
         # the backend reports them in Observation.ground_truth
         self._gt_extra = {k: [v] for k, v in first_obs.ground_truth.items()
-                          if k != "clearance_m" and (f"gt_{k}" in ARRAY_SPEC or (k.startswith("scan_") and k in ARRAY_SPEC))}
+                          if k != "clearance_m" and (f"gt_{k}" in ARRAY_SPEC or (k.startswith(("scan_", "sensor_")) and k in ARRAY_SPEC))}
+        self._rgb = [first_obs.rgb] if first_obs.rgb is not None else None
         self._cmds: list[np.ndarray] = []
         self._act_ts: list[int] = []
         self._flags: list[tuple[bool, bool, bool, int]] = []
@@ -71,6 +72,8 @@ class EpisodeRecorder:
         self._clear.append(o1.ground_truth.get("clearance_m", np.nan))
         for k, v in self._gt_extra.items():
             v.append(o1.ground_truth.get(k, np.full_like(np.asarray(v[0], dtype=np.float64), np.nan)))
+        if self._rgb is not None:
+            self._rgb.append(o1.rgb if o1.rgb is not None else np.zeros_like(self._rgb[0]))
         code = TERMINATION_CODES.get(result.termination_reason, TERMINATION_CODES["error"])
         self._flags.append((result.collision, result.terminated, result.truncated, code))
         if result.terminated or result.truncated:
@@ -104,10 +107,17 @@ class EpisodeRecorder:
             "gt_clearance_m": np.array(self._clear, dtype=np.float64),
         }
         for k, v in self._gt_extra.items():
-            arrays[k if k.startswith("scan_") else f"gt_{k}"] = np.asarray(v, dtype=np.float64)
+            name = k if k.startswith(("scan_", "sensor_")) else f"gt_{k}"
+            dt = np.dtype(ARRAY_SPEC[name][0])
+            if dt.kind in "iub":  # integer arrays: missing values (NaN filler) become 0
+                v = [np.nan_to_num(np.asarray(x, dtype=np.float64), nan=0.0) for x in v]
+            arrays[name] = np.asarray(v, dtype=np.float64).astype(dt)
         self.meta["num_transitions"] = len(self._cmds)
         self.meta["duration_s"] = float(arrays["dt_s"].sum())
-        return Episode(meta=self.meta, arrays=arrays)
+        rgb = np.stack(self._rgb).astype(np.uint8) if self._rgb is not None else None
+        if rgb is not None:
+            self.meta.setdefault("modalities", {})["rgb"] = True
+        return Episode(meta=self.meta, arrays=arrays, rgb_frames=rgb)
 
 
 class ExplorationCommands:

@@ -154,3 +154,44 @@ def test_scan_maps_match_analytic_inside_scan_and_clamp_outside():
     edge = int(np.argmin(np.abs(MAP_X - 0.8)))
     assert np.allclose(m[:, MAP_X >= 0.8], m[:, [edge]], atol=1e-6)
     assert not np.allclose(ref[:, MAP_X >= 0.8], ref[:, [edge]])
+
+
+def test_sidewalk_albedo_regions_and_determinism():
+    from go2wm.sim.sidewalk_texture import ASPHALT, CONCRETE, GRASS, sidewalk_albedo
+
+    p = {"width": 3.0, "curb_drop": 0.15, "slabs": [[4.0, 1.0, 0.1]], "grade": []}
+    x = np.linspace(0.2, 10.0, 400)
+    walk = sidewalk_albedo(x, np.full_like(x, 0.7), p, seed=1, cracks=False)
+    grass = sidewalk_albedo(x, np.full_like(x, 3.0), p, seed=1)
+    road = sidewalk_albedo(x, np.full_like(x, -3.5), p, seed=1)
+    assert walk.shape == (400, 3) and np.all((walk >= 0) & (walk <= 1))
+    # region colours are near their base colour on average (noise, tint and joints aside)
+    assert np.abs(np.median(walk, 0) - CONCRETE).max() < 0.08
+    assert np.abs(np.median(road, 0) - ASPHALT).max() < 0.06
+    assert np.median(grass[:, 1]) > np.median(grass[:, 0])  # green dominates
+    np.testing.assert_array_equal(walk, sidewalk_albedo(x, np.full_like(x, 0.7), p, seed=1, cracks=False))
+    assert not np.array_equal(walk, sidewalk_albedo(x, np.full_like(x, 0.7), p, seed=2, cracks=False))
+    # no curb: the road side is grass too
+    p2 = {**p, "curb_drop": 0.0}
+    side = sidewalk_albedo(x, np.full_like(x, -3.5), p2, seed=1)
+    assert np.median(side[:, 1]) > np.median(side[:, 2]) and np.abs(np.median(side, 0) - GRASS).max() < 0.12
+
+
+def test_bake_albedo_assigns_nearest_tile():
+    from go2wm.sim.isaac_texture import bake_albedo
+
+    tiles = [{"width": 3.0, "curb_drop": 0.15}, {"width": 3.0, "curb_drop": 0.0}]
+    origins = np.array([[0.0, 0.0], [0.0, 8.0]])
+    img = bake_albedo(tiles, origins, (-2.0, 2.0), (-4.0, 12.0), res=0.1)
+    assert img.shape == (160, 40, 3) and img.dtype == np.uint8
+    row = lambda y: img[int((y + 4.0) / 0.1)]  # noqa: E731
+    assert row(-3.5)[:, 2].mean() > row(-3.5)[:, 1].mean() - 5  # tile 0 road side: grey asphalt
+    assert row(4.5)[:, 1].mean() > row(4.5)[:, 2].mean() + 30  # tile 1 road side (y = -3.5 local): grass
+
+
+def test_generator_tile_origins_match_isaac_layout():
+    from go2wm.sim.isaac_texture import generator_tile_origins_xy
+
+    # observed in Isaac Lab 2.3 (terrain_origins) for the 6 E4 test tiles of 28 x 8 m
+    want = [[0.0, -20.0], [0.0, -12.0], [0.0, -4.0], [0.0, 4.0], [0.0, 12.0], [0.0, 20.0]]
+    np.testing.assert_allclose(generator_tile_origins_xy(6, (28.0, 8.0)), want)

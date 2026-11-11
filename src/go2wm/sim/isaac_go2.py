@@ -39,7 +39,7 @@ class IsaacGo2Adapter:
 
         from isaaclab.app import AppLauncher
 
-        self._app_launcher = AppLauncher(headless=c.get("headless", True), enable_cameras=c.get("enable_cameras", False), device=c["device"])
+        self._app_launcher = AppLauncher(headless=c.get("headless", True), enable_cameras=c.get("enable_cameras", False) or bool(c.get("rgb_camera")), device=c["device"])
         self.app = self._app_launcher.app
 
         import gymnasium as gym
@@ -123,7 +123,14 @@ class IsaacGo2Adapter:
                 static_friction=mu, dynamic_friction=mu)
             if hasattr(env_cfg, "curriculum") and hasattr(env_cfg.curriculum, "terrain_levels"):
                 env_cfg.curriculum.terrain_levels = None
-            if c.get("terrain_visual_color"):  # plain concrete-like surface (videos); physics unchanged
+            if c.get("terrain_texture"):  # procedural concrete/asphalt/grass look (rendering only), made with the mesh
+                from .isaac_texture import sidewalk_material_cfg
+
+                tt = c["terrain_texture"] if isinstance(c["terrain_texture"], dict) else {}
+                t.visual_material = sidewalk_material_cfg(self.tiles or [self.terrain], tuple(self.terrain["size"]),
+                                                          tt.get("cache_dir", "D:/go2wm/cache/textures"),
+                                                          float(tt.get("res", 0.02)))
+            elif c.get("terrain_visual_color"):  # plain concrete-like surface (videos); physics unchanged
                 t.visual_material = sim_utils.PreviewSurfaceCfg(
                     diffuse_color=tuple(float(v) for v in c["terrain_visual_color"]), roughness=0.9)
         # --- optional follow camera for videos (needs enable_cameras: true); render_rgb() returns a frame
@@ -134,8 +141,53 @@ class IsaacGo2Adapter:
             v.eye = tuple(float(x) for x in self.video.get("eye", (-2.2, -2.8, 1.4)))
             v.lookat = tuple(float(x) for x in self.video.get("lookat", (0.8, 0.0, 0.1)))
             v.resolution = tuple(int(x) for x in self.video.get("resolution", (1280, 720)))
+        # --- optional E4-C sensor rig (sim/sensors.py): ray-cast range sensors against the terrain mesh,
+        # each a RayCaster on the base whose starts/directions are set in the base frame after init
+        # (LiDARs get fresh random directions every frame), plus an optional front RGB camera
+        if c.get("rgb_camera"):
+            from isaaclab.sensors import TiledCameraCfg
+
+            # DLSS (Isaac's default) renders a 224 px camera at ~130 px, below its 300 px minimum, and is
+            # temporal; frames came back all black in most runs. FXAA renders at native resolution per frame.
+            env_cfg.sim.render.antialiasing_mode = c.get("render_antialiasing", "FXAA")
+
+            from .sensors import RGB_SPEC
+
+            f_mm = 10.0
+            th = math.radians(RGB_SPEC["pitch_deg"]) / 2
+            setattr(env_cfg.scene, "rig_rgb", TiledCameraCfg(
+                prim_path="{ENV_REGEX_NS}/Robot/base/front_cam",
+                offset=TiledCameraCfg.OffsetCfg(pos=tuple(RGB_SPEC["mount_pos"]), rot=(math.cos(th), 0.0, math.sin(th), 0.0),
+                                                convention="world"),
+                data_types=["rgb"], width=RGB_SPEC["width"], height=RGB_SPEC["height"],
+                spawn=sim_utils.PinholeCameraCfg(focal_length=f_mm, clipping_range=(0.05, 80.0),
+                                                 horizontal_aperture=2 * f_mm * math.tan(math.radians(RGB_SPEC["hfov_deg"]) / 2))))
+        self.rig_names = list(c.get("sensor_rig") or [])
+        if self.rig_names:
+            from isaaclab.sensors import RayCasterCfg
+            from isaaclab.sensors.ray_caster.patterns import GridPatternCfg
+
+            from .sensors import SENSOR_SPECS, n_rays
+
+            for name in self.rig_names:
+                spec = SENSOR_SPECS[name]
+                setattr(env_cfg.scene, f"rig_{name}", RayCasterCfg(
+                    prim_path="{ENV_REGEX_NS}/Robot/base", mesh_prim_paths=["/World/ground"], ray_alignment="base",
+                    # n placeholder rays on a 1 mm line (overwritten after init)
+                    pattern_cfg=GridPatternCfg(resolution=0.001, size=(round((n_rays(spec) - 1) * 0.001, 6), 0.0)),
+                    max_distance=float(spec["range_m"][1]) + 1.0, debug_vis=False))
         self.env = gym.make(c["task"], cfg=env_cfg, render_mode="rgb_array" if self.video else None)
         self.uenv = self.env.unwrapped
+        self.terrain_texture_png = None
+        if self.terrain and c.get("terrain_texture"):  # the texture assumed these tile origins; check them
+            from .isaac_texture import generator_tile_origins_xy
+
+            ter = self.uenv.scene.terrain
+            got = ter.terrain_origins[0, :, :2].cpu().numpy().astype(np.float64)
+            want = generator_tile_origins_xy(len(self.tiles or [self.terrain]), tuple(self.terrain["size"]))
+            if not np.allclose(got, want, atol=1e-3):
+                raise RuntimeError(f"terrain texture tile origins {want.tolist()} != generator origins {got.tolist()}")
+            self.terrain_texture_png = getattr(ter.cfg.visual_material, "png", None)
         self.wrapped = RslRlVecEnvWrapper(self.env)
         agent_cfg = load_cfg_from_registry(c["task"], "rsl_rl_cfg_entry_point")
         self.ckpt_path = self._resolve_checkpoint(c)
@@ -153,6 +205,11 @@ class IsaacGo2Adapter:
             self.robot_foot_ids = self.robot.find_bodies(".*_foot")[0]
             # rough-terrain tasks carry a height scanner (policy input); used for height above ground
             self.scanner = dict(self.uenv.scene.sensors).get("height_scanner")
+        self.rig = {n: self.uenv.scene.sensors[f"rig_{n}"] for n in self.rig_names}
+        self.rgb_cam = dict(self.uenv.scene.sensors).get("rig_rgb")
+        self._rig_rng = np.random.default_rng(0)
+        for n in self.rig_names:
+            self._set_rig_rays(n)
         self.step_dt = float(self.uenv.step_dt)
         self.n_policy_steps = max(1, int(round(self.control_dt / self.step_dt)))
         if abs(self.n_policy_steps * self.step_dt - self.control_dt) > 1e-6:
@@ -231,6 +288,7 @@ class IsaacGo2Adapter:
             self.terrain = self.tiles[i]
             self._tile_origin = self.uenv.scene.terrain.terrain_origins[0, i].cpu().numpy().astype(np.float64)
             self.scene.params["terrain_tile"] = i
+            self.scene.params["tile_origin_w"] = self._tile_origin.round(5).tolist()
         if self.terrain:
             self.scene.params["terrain"] = self.terrain
             if not self.cfg.get("scene_obstacles", True):
@@ -238,6 +296,7 @@ class IsaacGo2Adapter:
             if self.cfg.get("scene_bounds"):  # e.g. include the road beyond the curb (terrain runs only)
                 self.scene.bounds = tuple(float(v) for v in self.cfg["scene_bounds"])
         torch.manual_seed(seed)
+        self._rig_rng = np.random.default_rng(seed + 7_000_000)  # sensor noise / LiDAR directions per episode
         self.wrapped.reset()
         self._place_obstacles(self.scene)
         # place robot at scene start (relative to env origin), zero velocity, default joints
@@ -342,6 +401,7 @@ class IsaacGo2Adapter:
             "collision_detection": "geometric footprint circle vs known obstacle map",
             "terrain": self.terrain or "task default (flat plane)",
             "height_scanner": self.scanner is not None,
+            "sensor_rig": self._rig_meta(),
             "height_scan_pattern_xy": (self.scanner.ray_starts[0, :, :2].cpu().numpy().round(4).tolist()
                                        if (self.scanner is not None and self.cfg.get("record_height_scan")) else None),
             "config": self.cfg,
@@ -383,11 +443,59 @@ class IsaacGo2Adapter:
         # slip = horizontal speed of feet that are in contact (0 for a perfect no-slip stance)
         slip = torch.where(contact, vel, torch.zeros_like(vel))
         out["foot_slip_m_s"] = slip.cpu().numpy().astype(np.float64).tolist()
+        for n in self.rig_names:
+            out.update(self._rig_frame(n, st))
         if self.cfg.get("record_height_scan") and self.scanner is not None:
             z = self.scanner.data.ray_hits_w[0, :, 2] - float(self._origin()[2])
             z = torch.where(torch.isfinite(z), z, torch.full_like(z, float("nan")))
             out["scan_height_m"] = z.cpu().numpy().astype(np.float64).tolist()
         return out
+
+    def _set_rig_rays(self, name: str) -> None:
+        from .sensors import SENSOR_SPECS, base_frame_rays
+
+        starts, dirs = base_frame_rays(SENSOR_SPECS[name], self._rig_rng)
+        sen = self.rig[name]
+        sen.ray_starts[0] = self.torch.as_tensor(starts, dtype=sen.ray_starts.dtype, device=sen.ray_starts.device)
+        sen.ray_directions[0] = self.torch.as_tensor(dirs, dtype=sen.ray_directions.dtype, device=sen.ray_directions.device)
+
+    def _rig_frame(self, name: str, st: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
+        """One frame of a range sensor -> elevation grid around the robot (scene-frame heights)."""
+        from .sensors import SENSOR_SPECS, bin_elevation, corrupt_hits, pitch_matrix
+
+        spec = SENSOR_SPECS[name]
+        sen = self.rig[name]
+        if spec["kind"] != "pinhole":  # non-repetitive LiDAR scan: new directions before this frame's cast
+            self._set_rig_rays(name)
+        hits = sen.data.ray_hits_w[0].detach().cpu().numpy().astype(np.float64)
+        starts = sen._ray_starts_w[0].detach().cpu().numpy().astype(np.float64)
+        dirs = sen._ray_directions_w[0].detach().cpu().numpy().astype(np.float64)
+        w, x, y, z = st["quat"] / np.linalg.norm(st["quat"])
+        R = np.array([[1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y)],
+                      [2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x)],
+                      [2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)]])
+        axis = R @ pitch_matrix(spec["pitch_deg"]) @ np.array([1.0, 0.0, 0.0])
+        pts = corrupt_hits(starts, dirs, hits, spec, self._rig_rng, optical_axis_w=axis)
+        o = self._origin()
+        yaw = math.atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z))
+        # z_ref 0: the generator only shifts tiles in x/y, so world z of the surface = terrain.sidewalk_height
+        elev, cnt = bin_elevation(pts, o[:2] + st["pos"][:2], yaw, z_ref=0.0)
+        return {f"sensor_{name}_elev_m": elev, f"sensor_{name}_count": cnt}
+
+    def _rig_meta(self) -> dict[str, Any] | None:
+        if not self.rig_names and self.rgb_cam is None:
+            return None
+        from .sensors import ELEV_GRID, GRID_SHAPE, RGB_SPEC, SENSOR_SPECS
+
+        return {"range_sensors": {n: SENSOR_SPECS[n] for n in self.rig_names}, "elev_grid": ELEV_GRID,
+                "grid_shape": list(GRID_SHAPE), "rgb": RGB_SPEC if self.rgb_cam is not None else None,
+                "frames": "robot-centred yaw-aligned grid; heights = world hit z = terrain frame (terrain.sidewalk_height); "
+                          "state z = terrain z - tile origin z (scene.params.tile_origin_w); scan_height_m = hit z - tile origin z"}
+
+    def _rgb_frame(self) -> np.ndarray | None:
+        if self.rgb_cam is None:
+            return None
+        return self.rgb_cam.data.output["rgb"][0, ..., :3].detach().cpu().numpy().astype(np.uint8)
 
     def _base_contact(self) -> bool:
         f = self.contact.data.net_forces_w_history[0, :, self.base_body_ids]  # [hist, n_base, 3]
@@ -416,5 +524,6 @@ class IsaacGo2Adapter:
             joint_pos=s["jp"],
             joint_vel=s["jv"],
             ground_truth=gt,
-            valid={"rgb": False, "depth": False, "joints": True},
+            rgb=self._rgb_frame(),
+            valid={"rgb": self.rgb_cam is not None, "depth": False, "joints": True},
         )
