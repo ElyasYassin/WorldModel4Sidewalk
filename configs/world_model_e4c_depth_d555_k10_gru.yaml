@@ -1,0 +1,5 @@
+# E4-C data (data/go2_e4c_train): terrain GRU on a sensor elevation map accumulated over the last 10 frames (1 s).
+# Perfect registration (recorded poses). See go2wm.models.terrain_map.fused_sensor_maps.
+_base_: world_model_e4_terrain_gru.yaml
+model:
+  terrain_source: "sensor:depth_d555@10"

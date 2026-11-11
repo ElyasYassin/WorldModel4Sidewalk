@@ -121,7 +121,8 @@ def build_windows(episodes: list[Episode], history: int, horizon: int, stride: i
     """Windows never cross episode boundaries; history needs K prior transitions.
     terrain_map=True adds a start-frame height map per window from the tile geometry (zeros on flat
     ground); terrain_scan=True adds the same map built from the height scan at the window start;
-    terrain_sensors=("sensor:depth_d555", ...) adds maps from those E4-C sensors' single-frame grids."""
+    terrain_sensors=("sensor:depth_d555", "sensor:depth_d555+l1@10", ...) adds maps from E4-C sensor
+    grids: one or more sensors ("+"), accumulated over the last N frames ("@N", default 1)."""
     K, H = history, horizon
     out: dict[str, list] = {k: [] for k in WindowArrays.__dataclass_fields__ if not k.startswith("terrain_map")}
     maps: list[np.ndarray] = []
@@ -163,22 +164,21 @@ def build_windows(episodes: list[Episode], history: int, horizon: int, stride: i
                 else:
                     smaps.append(scan_maps(ep["scan_height_m"][idx], np.asarray(pat)))
         if terrain_sensors:
-            from ..models.terrain_map import MAP_X, MAP_Y, sensor_maps
+            from ..models.terrain_map import MAP_X, MAP_Y, episode_height_fn, fused_sensor_maps, parse_sensor_source
 
             idx = np.arange(K, T - H + 1, stride)
             if len(idx):
+                # ground under the base in the sensor (tile-surface) frame. gt_ground_z_m is in a frame
+                # shifted by a per-tile constant, so it cannot be used directly.
+                hfn = episode_height_fn(ep.meta)
+                gz = hfn(pose[idx, 0], pose[idx, 1]) if hfn is not None else np.zeros(len(idx))
                 for k in terrain_sensors:
-                    arr = f"sensor_{k.split(':', 1)[1]}_elev_m"
-                    if arr not in ep.arrays:
+                    names, frames = parse_sensor_source(k)
+                    arrs = [f"sensor_{nm}_elev_m" for nm in names]
+                    if not all(a in ep.arrays for a in arrs):
                         sens[k].append(np.zeros((len(idx), len(MAP_Y), len(MAP_X)), np.float32))
                     else:
-                        # ground under the base in the sensor (tile-surface) frame. gt_ground_z_m is in a frame
-                        # shifted by a per-tile constant, so it cannot be used directly.
-                        from ..models.terrain_map import episode_height_fn
-
-                        hfn = episode_height_fn(ep.meta)
-                        gz = hfn(pose[idx, 0], pose[idx, 1]) if hfn is not None else np.zeros(len(idx))
-                        sens[k].append(sensor_maps(ep[arr][idx], gz))
+                        sens[k].append(fused_sensor_maps([ep[a] for a in arrs], pose, idx, gz, frames))
     if not out["hist_feat"]:
         raise ValueError(f"no windows (history={K}, horizon={H}); episodes too short?")
     w = WindowArrays(**{k: np.asarray(v, dtype=np.float32 if k not in ("episode_index", "start_index") else np.int64) for k, v in out.items()})

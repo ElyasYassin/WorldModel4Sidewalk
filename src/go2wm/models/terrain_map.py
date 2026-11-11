@@ -106,6 +106,11 @@ def sensor_maps(elev: np.ndarray, ground_z: np.ndarray, fill_iters: int = 60) ->
             cnt += fin
     with np.errstate(invalid="ignore", divide="ignore"):
         m = np.where(cnt > 0, acc / np.maximum(cnt, 1), np.nan)
+    return _fill_and_reference(m, ground_z, fill_iters)
+
+
+def _fill_and_reference(m: np.ndarray, ground_z: np.ndarray, fill_iters: int = 60) -> np.ndarray:
+    """Fill unobserved MAP points from observed neighbours (grown outward), else 0; subtract ground_z."""
     for _ in range(fill_iters):
         miss = ~np.isfinite(m)
         if not miss.any():
@@ -117,6 +122,56 @@ def sensor_maps(elev: np.ndarray, ground_z: np.ndarray, fill_iters: int = 60) ->
         m = np.where(miss & (c > 0), s / np.maximum(c, 1), m)
     m = np.where(np.isfinite(m), m - np.asarray(ground_z, np.float32)[:, None, None], 0.0)
     return m.astype(np.float32)
+
+
+def parse_sensor_source(source: str) -> tuple[list[str], int]:
+    """"sensor:depth_d555" -> (["depth_d555"], 1); "sensor:depth_d555+l1@10" -> (["depth_d555", "l1"], 10)."""
+    spec = source.split(":", 1)[1]
+    names, _, k = spec.partition("@")
+    return names.split("+"), int(k) if k else 1
+
+
+def fused_sensor_maps(elevs: list[np.ndarray], pose: np.ndarray, starts: np.ndarray, ground_z: np.ndarray,
+                      frames: int, fill_iters: int = 60) -> np.ndarray:
+    """Elevation map accumulated over the last `frames` frames (0.1 s each) of one or more sensors.
+
+    elevs: per sensor [T, nx, ny] grids (go2wm.sim.sensors.ELEV_GRID, terrain-frame heights, NaN empty);
+    pose [T, 3] scene-frame (x, y, yaw) of each frame; starts [N] the window-start frames. Every observed
+    cell of frames s-frames+1..s is moved into the frame-s robot frame with the recorded poses (perfect
+    registration: odometry error is not modelled) and averaged into the MAP grid point whose 10 cm cell
+    holds it; then filled and referenced as in sensor_maps. frames=1 equals sensor_maps for one sensor."""
+    from ..sim.sensors import ELEV_GRID, grid_centres
+
+    cx, cy = grid_centres(ELEV_GRID)
+    GX, GY = np.meshgrid(cx, cy, indexing="ij")  # [nx, ny], like the grids
+    res = MAP_X[1] - MAP_X[0]
+    nyx = (len(MAP_Y), len(MAP_X))
+    out = np.empty((len(starts), *nyx), np.float32)
+    for n, s in enumerate(starts):
+        acc = np.zeros(nyx[0] * nyx[1])
+        cnt = np.zeros_like(acc)
+        x0, y0, th0 = pose[s]
+        c0, s0 = np.cos(th0), np.sin(th0)
+        for t in range(max(0, s - frames + 1), s + 1):
+            xt, yt, tht = pose[t]
+            ct, st = np.cos(tht), np.sin(tht)
+            for e in elevs:
+                z = e[t].astype(np.float64)
+                ok = np.isfinite(z)
+                if not ok.any():
+                    continue
+                gx, gy = GX[ok], GY[ok]
+                wx, wy = xt + ct * gx - st * gy - x0, yt + st * gx + ct * gy - y0
+                bx, by = c0 * wx + s0 * wy, -s0 * wx + c0 * wy
+                ix = np.round((bx - MAP_X[0]) / res).astype(int)
+                iy = np.round((by - MAP_Y[0]) / res).astype(int)
+                m = (ix >= 0) & (ix < nyx[1]) & (iy >= 0) & (iy < nyx[0])
+                flat = iy[m] * nyx[1] + ix[m]
+                acc += np.bincount(flat, weights=z[ok][m], minlength=acc.size)
+                cnt += np.bincount(flat, minlength=acc.size)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            out[n] = np.where(cnt > 0, acc / np.maximum(cnt, 1), np.nan).reshape(nyx)
+    return _fill_and_reference(out, ground_z, fill_iters)
 
 
 def sample_patch(maps: torch.Tensor, pose: torch.Tensor) -> torch.Tensor:

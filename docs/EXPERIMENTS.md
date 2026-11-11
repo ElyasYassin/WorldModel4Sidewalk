@@ -498,21 +498,24 @@ lateral commands. It stands still for small planar commands, including all turn-
 | | terrain GRU, scanner | 0.051 | 0.108 | 0.176 ± 0.004 |
 | | kinematics | 0.135 | 0.265 | 0.399 |
 
-- **Gain over the GRU on the final test, by `segment_cmd`** (seed-mean error minus seed-mean GRU error, m; range over
-  the 3 seeds in brackets):
+- **Gain over the GRU on the final test, by `segment_cmd`** (seed-mean error minus seed-mean GRU error, m; [min, max]
+  of the paired per-seed differences). Corrected 2026-11-11: recomputed with
+  `python scripts/summarize_seeds.py outputs/e4s/final_test/prediction_metrics.json --ref e4s_gru`. The table first
+  written here did not match the saved metrics (its source could not be traced); the scanner's step gain at 2 s was
+  overstated (−0.015 → −0.011).
 
 | segment (episodes) | map 2 s | scanner 2 s | map 3 s | scanner 3 s |
 |---|---|---|---|---|
-| step (38) | −0.022 [−0.027, −0.019] | −0.015 [−0.024, −0.010] | −0.040 [−0.051, −0.032] | −0.016 [−0.031, −0.008] |
-| grade (18) | −0.007 | −0.005 | −0.007 | −0.016 |
-| curb (7) | −0.003 | +0.005 | +0.003 | −0.003 |
-| plain (48) | −0.002 | −0.000 | −0.009 | −0.005 |
+| step (38) | −0.021 [−0.026, −0.015] | −0.011 [−0.013, −0.009] | −0.043 [−0.049, −0.038] | −0.016 [−0.025, −0.010] |
+| grade (18) | −0.006 [−0.013, +0.002] | +0.003 [−0.008, +0.019] | −0.005 [−0.028, +0.023] | +0.004 [−0.021, +0.040] |
+| curb (7) | +0.009 [−0.015, +0.030] | +0.008 [−0.016, +0.031] | +0.014 [−0.017, +0.030] | −0.001 [−0.036, +0.022] |
+| plain (48) | −0.002 [−0.005, +0.003] | −0.000 [−0.008, +0.005] | −0.007 [−0.015, −0.000] | −0.006 [−0.020, +0.004] |
 
 - **Findings.**
   - The E4-P2b result replicates on fresh data: GRU 0.184 and perfect-map terrain GRU 0.165 m at 3 s, the same
     numbers as before.
-  - The scanner keeps part of the gain. On step windows of unseen tiles it recovers about 70 % of the perfect map's
-    gain at 2 s, but only 40 % at 3 s. At 0.3–0.9 m/s the robot covers 0.9–2.7 m in 3 s, mostly beyond the scanner's
+  - The scanner keeps part of the gain. On step windows of unseen tiles it recovers about half of the perfect map's
+    gain at 2 s (0.011 of 0.021 m) and 37 % at 3 s. At 0.3–0.9 m/s the robot covers 0.9–2.7 m in 3 s, mostly beyond the scanner's
     0.8 m reach, so this is what a short-range sensor should give: it helps for what is about to be stepped on, not
     for terrain further ahead.
   - On dev-test (seen tiles) the scanner's gain is within seed noise overall and slightly negative on steps at 2 s
@@ -667,3 +670,85 @@ lateral commands. It stands still for small planar commands, including all turn-
   main assumption; a real D555 outdoors will likely be worse. Registration is perfect apart from the σ_reg
   sensitivity check. The upright Mid-360's 44 cm p90 at 0.3–0.8 m comes from about 1 % of cells, so it is not
   meaningful.
+
+## E4-C (2): does a sensor's map help prediction? Single frame (2026-11-11)
+
+- **Setup.** The E4-S protocol on E4-C data (`data/go2_e4c_train`, manifest `e4`: 100/22/22; final test
+  `data/go2_e4c_test`, 48 episodes on 6 unseen tiles, `all_test`). Eight models × 3 seeds, identical except for the
+  terrain input: GRU (none), perfect map, height scanner, and the single-frame elevation grid of each E4-C sensor.
+  - New `terrain_source: "sensor:<name>"`: the sensor's 5 cm grid at the window start is averaged onto the 10 cm model
+    map (`go2wm.models.terrain_map.sensor_maps`).
+  - Unobserved points take the mean of observed neighbours, grown outward, as the scanner map holds its edge values.
+  - Heights are relative to the ground under the base in the tile frame. This is simulator truth here, standing in
+    for the leg-kinematic ground estimate.
+  - Bug found and fixed while building this: `gt_ground_z_m` is in a frame shifted by a per-tile constant
+    (4–10 cm), so it cannot be used as the reference.
+  - Configs `configs/world_model_e4c_*.yaml`; `scripts/e4c_train_queue.ps1`; summary
+    `python scripts/summarize_seeds.py outputs/e4c/final_test/prediction_metrics.json --ref e4c_gru`.
+- **Position error (m), seed mean ± sd.**
+
+| model | dev-test 3 s | final 1 s | final 2 s | final 3 s |
+|---|---|---|---|---|
+| GRU, no terrain | 0.201 ± 0.004 | 0.049 | 0.108 | 0.180 ± 0.005 |
+| perfect map | **0.163** ± 0.005 | 0.046 | **0.094** | **0.154** ± 0.006 |
+| height scanner | 0.175 ± 0.005 | 0.048 | 0.099 | 0.164 ± 0.001 |
+| D555 | 0.188 ± 0.005 | 0.049 | 0.108 | 0.178 ± 0.007 |
+| D435 | 0.191 ± 0.009 | 0.049 | 0.107 | 0.179 ± 0.009 |
+| L1 | 0.190 ± 0.007 | 0.051 | 0.107 | 0.176 ± 0.002 |
+| Mid-360 tilted | 0.189 ± 0.008 | 0.048 | 0.104 | 0.174 ± 0.004 |
+| Mid-360 upright | 0.203 ± 0.004 | 0.049 | 0.109 | 0.180 ± 0.003 |
+| kinematics | 0.427 | 0.161 | 0.316 | 0.478 |
+
+- **Gain over the GRU at 2 s on steps** (seed-mean diff, m; [min, max] over paired seeds):
+
+| model | dev-test (19 eps, seen tiles) | final test (39 eps, unseen tiles) |
+|---|---|---|
+| perfect map | −0.036 [−0.038, −0.034] | −0.027 [−0.036, −0.017] |
+| height scanner | −0.027 [−0.031, −0.025] | −0.010 [−0.020, −0.000] |
+| D555 | −0.018 [−0.026, −0.012] | +0.008 [+0.003, +0.017] |
+| D435 | −0.015 [−0.026, −0.006] | +0.007 [−0.001, +0.018] |
+| L1 | −0.017 [−0.024, −0.012] | +0.004 [−0.002, +0.014] |
+| Mid-360 tilted | −0.012 [−0.025, −0.006] | +0.002 [−0.000, +0.004] |
+
+- **Findings.**
+  - The perfect-map and scanner gains replicate on a third fresh sample (final 3 s: GRU 0.180, map 0.154, scanner
+    0.164 m).
+  - **No single-frame sensor map helps on steps of unseen tiles.** The D555 is slightly worse than no terrain
+    (+0.008 m at 2 s, all three seeds worse). On seen tiles the same models do help (−0.012 to −0.018 m), so what they
+    learn about steps does not transfer.
+  - Every terrain input gives a small, consistent gain on plain windows of the final test (−0.012 to −0.019 m at
+    3 s for all sensors except the upright Mid-360), so the overall 3 s numbers (0.174–0.179 m) sit just below the GRU.
+- **Diagnosis** (final-test step windows, |sensor map − perfect map|, median / p90 cm, |y| ≤ 0.3 m):
+
+| map region | scanner | D555 | L1 | Mid-360 tilted |
+|---|---|---|---|---|
+| under the robot (x −0.3 to 0.3 m) | 0.1 / 0.3 | 5.1 / 11.8 | 0.6 / 6.5 | 7.4 / 12.7 |
+| 0.3–0.8 m | 0.1 / 0.3 | 0.3 / 11.4 | 0.4 / 1.2 | 1.4 / 10.9 |
+| 0.8–1.5 m | 0.2 / 11.5 | 0.2 / 0.6 | 0.4 / 2.0 | 0.4 / 2.1 |
+
+  - The depth camera and tilted Mid-360 are blind under and just ahead of the robot. Filling copies whatever they see
+    at 0.5 m+ into that zone, so once the robot is at a step, the map shows the far side's level under its feet.
+  - Relief in the 1.5 m corridor ahead: 15.6 cm true vs 6.4 cm in the D555 map (L1 16.0, scanner 14.5).
+  - The scanner and the perfect map are exact under the robot, which is the part the model uses most at steps.
+  - So the comparison was unfair to the cameras: a real robot keeps an elevation map that accumulates frames as it
+    walks. That is E4-C (3).
+
+## E4-C (3): fused sensor maps (running, 2026-11-11)
+
+- `terrain_source: "sensor:<a>[+<b>]@K"`: the observed cells of the last K frames, from one or more sensors, moved
+  into the current robot frame with the recorded poses and averaged (`fused_sensor_maps`). Registration is perfect,
+  so this is an upper bound for an odometry-registered elevation map; the E4-C (1) σ_reg check puts 5 mm/frame at
+  about +0.1–0.2 cm p90 on accuracy.
+- K = 1 reproduces the single-frame maps exactly (max difference 0), so E4-C (2) checkpoints are unchanged.
+- Map check, final-test step windows (subsample of 16 episodes), p90 |error| cm:
+
+| map region | D555 single | D555 @10 | L1 @10 | D555 + L1 @10 | Mid-360 tilted @10 |
+|---|---|---|---|---|---|
+| under the robot | 12.1 | 6.2 | 1.5 | 1.5 | 10.9 |
+| 0.3–0.8 m | 3.0 | 0.6 | 0.6 | 0.5 | 2.3 |
+| 0.8–1.5 m | 1.0 | 0.9 | 3.1 | 1.0 | 3.0 |
+| 1.5–2.5 m | 2.7 | 1.4 | 4.4 | 1.4 | 2.7 |
+| corridor relief (true 14.6 cm) | 12.1 | 14.4 | 14.7 | 14.6 | 13.0 |
+
+- Training: `scripts\e4c_train_queue.ps1 -Models depth_d555_k10_gru,depth_d435_k10_gru,l1_k10_gru,mid360_tilt_k10_gru,depth_d555_l1_k10_gru`
+  (5 × 3 seeds).

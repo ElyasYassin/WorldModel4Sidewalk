@@ -211,3 +211,26 @@ def test_sensor_maps_resample_fill_and_reference():
     assert abs(m[0, 12, ix(1.0)] - 0.08) < 1e-3 and abs(m[0, 12, ix(0.4)]) < 1e-3
     assert abs(m[0, 12, ix(-0.5)]) < 1e-3  # filled from the nearest observed (flat) ground
     assert np.all(sensor_maps(np.full((1, *GRID_SHAPE), np.nan, np.float16), np.zeros(1)) == 0)
+
+
+def test_fused_sensor_maps_single_frame_and_motion():
+    from go2wm.models.terrain_map import MAP_X, fused_sensor_maps, sensor_maps
+    from go2wm.sim.sensors import grid_centres
+
+    cx, cy = grid_centres()
+    X, _ = np.meshgrid(cx, cy, indexing="ij")
+    # robot walks +x at 0.1 m/frame over a world step at x_w = 1.0 m; the sensor only sees 0.5-2 m ahead
+    T = 8
+    pose = np.stack([0.1 * np.arange(T), np.zeros(T), np.zeros(T)], 1)
+    elev = np.full((T, *X.shape), np.nan, np.float16)
+    for t in range(T):
+        vis = (X > 0.5) & (X < 2.0)
+        elev[t][vis] = np.where(X[vis] + pose[t, 0] > 1.0, 0.1, 0.0)
+    gz = np.zeros(1)
+    one = fused_sensor_maps([elev], pose, np.array([T - 1]), gz, 1)
+    assert np.allclose(one, sensor_maps(elev[T - 1 :], gz))
+    fused = fused_sensor_maps([elev], pose, np.array([T - 1]), gz, 8)
+    # at t = 7 the robot is at x_w = 0.7; the step is 0.3 m ahead, inside the camera's blind zone
+    ix = lambda x: int(np.argmin(np.abs(MAP_X - x)))  # noqa: E731
+    assert abs(fused[0, 12, ix(0.0)]) < 1e-3 and abs(fused[0, 12, ix(0.5)] - 0.1) < 1e-3
+    assert abs(one[0, 12, ix(0.0)] - 0.1) < 1e-3  # single frame: step edge filled into the blind zone
