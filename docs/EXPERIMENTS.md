@@ -1011,3 +1011,19 @@ seed 300), realistic profile (`outputs/missions_final2`):
 
 Pessimistic sensor errors (`outputs/missions_final2_pess`) and v2 on the seed-200 set (`outputs/missions_final_v2code`,
 informative only) follow.
+
+### v2 under pessimistic sensor errors (seed 300, `outputs/missions_final2_pess`)
+
+| strategy | recall | precision | false / mission | upheaval found / D405 / err [mm] / ADA ok | hole found / D405 / depth err [mm] | puddle found |
+|---|---|---|---|---|---|---|
+| walkover | 81 % | 91 % | 0.29 | 12/21 / 7 / 6.0 / 100 % | 27/34 / 5 / 2.5 | 29/29 |
+| slow | 83 % | 91 % | 0.29 | 13/21 / 4 / 7.1 / 100 % | 30/34 / 5 / 2.6 | 27/29 |
+| approach | 79 % | 88 % | 0.38 | 13/21 / 11 / 1.3 / 92 % | 25/34 / 22 / 1.9 | 28/29 |
+
+Doubled noise, 10 % dropout, 1° calibration error and 2.5× odometry drift cost only a few points of detection
+(recall 86 → 81 % for walkover). Measurement is where the strategies separate:
+- **Walkover's upheaval step error triples** (2.1 → 6.0 mm), enough to blur the 6.4 / 13 mm ADA thresholds.
+- **Approach stays at 1.3 mm,** because the D405 at its stand-off is barely affected by the long-range error sources.
+
+This is the clearest case for active inspection. Under the realistic profile its benefit is mostly *more defects with
+close-range evidence*; under worse sensors it is also *the only strategy that keeps millimetre measurements*.
