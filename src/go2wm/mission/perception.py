@@ -145,7 +145,7 @@ def detect_candidates(elev: np.ndarray, count: np.ndarray, pose: np.ndarray, t: 
         out.append(Observation(t, sensor, c["kind"], np.array([wx, wy]), float(np.hypot(xr, yr)),
                                value_m=None, extent_m=float(max(np.ptp(CX[i]), np.ptp(CY[j])) + ELEV_GRID["res"]),
                                confidence=0.4, provenance="detected",
-                               extra={"peak_dev_m": c["peak"], "cells": int(len(c["idx"])),
+                               extra={"peak_dev_m": c["peak"], "cells": int(len(c["idx"])), "view_xy": [float(pose[0]), float(pose[1])],
                                       "y_span": [float(to_world(pose, xr, CY[j].min())[1]),
                                                  float(to_world(pose, xr, CY[j].max())[1])]}))
     return out
@@ -195,7 +195,7 @@ def detect_dropouts(count: np.ndarray, expected: np.ndarray, pose: np.ndarray, t
         wx, wy = to_world(pose, x_, y_)
         out.append(Observation(t, sensor, "dropout", np.array([wx, wy]), float(np.hypot(x_, y_)), value_m=None,
                                extent_m=float(max(np.ptp(CX[i]), np.ptp(CY[j])) + ELEV_GRID["res"]), confidence=0.35,
-                               provenance="detected", extra={"cells": int(len(comp)), "note": "no returns: possible water"}))
+                               provenance="detected", extra={"cells": int(len(comp)), "note": "no returns: possible water", "view_xy": [float(pose[0]), float(pose[1])]}))
     return out
 
 

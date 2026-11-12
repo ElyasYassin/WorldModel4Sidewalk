@@ -928,3 +928,32 @@ Ablation (realistic, D555, p90 at 0.3–0.8 m / step p90):
 Near/far step study, realistic profile:
 - **D405 at its 0.53 m stand-off:** 0.1–0.4 mm p90 with 100 % ADA class agreement for every step size, in all profiles.
 - **D555:** ≤ 1.1 mm p90 within 1.2 m for steps up to 11 mm; degrades sharply beyond 1.6 m.
+
+## Phase 1, step 5: final strategy evaluation on fresh tiles (2026-11-12, frozen at commit 596cdb4)
+
+24 fresh defect tiles (`outputs/defect_tiles_final`, seed 200), not looked at before the perception was frozen. The
+seed-100 tiles were used to diagnose failures, so they count as a second dev set. Mock kinematics, D555 + D405,
+realistic profile, `outputs/missions_final`. Defects to find: upheaval faults, holes, puddles (cracks are scored
+separately).
+
+| strategy | time [s] | recall | precision | false / mission | upheaval found / D405 / err [mm] / ADA ok | hole found / D405 / depth err [mm] | puddle found |
+|---|---|---|---|---|---|---|---|
+| walkover | 33.7 | 86 % | 100 % | 0.00 | 22/26 / 9 / 0.5 / 100 % | 22/26 / 1 / 2.8 | 17/19 |
+| slow | 37.2 | 83 % | 94 % | 0.17 | 22/26 / 9 / 0.3 / 100 % | 20/26 / 0 / 2.1 | 17/19 |
+| approach | 40.0 | 80 % | 86 % | 0.38 | 22/26 / 18 / 0.5 / 100 % | 18/26 / 12 / 0.7 | 17/19 |
+
+Reading:
+- **Walkover is the best detector:** no false findings on unseen tiles, and 86 % of defects found.
+- **Approach buys close-range evidence:**
+  - D405 measurements on 2× the upheavals and 12× the holes;
+  - hole depth error 2.8 → 0.7 mm;
+  - +6.3 s per 22 m route.
+- **Approach's cost in detection quality:** it loses 4 holes and adds 9 false findings. Two mechanisms:
+  1. While it dwells, the stereo fixed-pattern error repeats in every frame, so a noise blob ahead gets "confirmed".
+  2. Up close, a hole's far wall reads as a short edge, and the memory then absorbed the hole into it.
+
+  Both are addressed after the freeze (multi-view baseline ≥ 15 cm for confirmation; a short edge inside a hole is
+  its wall) and evaluated on another fresh set (seed 300), so these numbers stay as the frozen result.
+- **All approach missions reached the goal.**
+- **Upheaval misses** are mostly small (1.7–2.3 cm) half-width faults.
+- **Puddles** are found from depth dropout alone; their depth is not measured (camera needed).

@@ -73,3 +73,24 @@ def test_shape_votes_relabel_a_depression_as_edge():
     for _ in range(3):
         a = m.vote_shape(a, "step")
     assert m.findings[a]["kind"] == "edge"
+
+
+def test_short_edge_inside_a_hole_is_its_wall_and_static_views_do_not_count():
+    m = _mem()
+    for t in (0.0, 0.1):
+        m.add(_det(t, "depression", 3.0, 0.2, ext=0.5))
+        e = _det(t, "edge", 3.05, 0.25, ext=0.6)
+        e.extra["y_span"] = [0.0, 0.5]
+        m.add(e)
+    real = m.to_dict()["findings"]
+    assert [f["kind"] for f in real.values()] == ["depression"]
+    # the same blob detected repeatedly from one standing position is not confirmed
+    m2 = _mem()
+    for t in (0.0, 0.1, 0.2):
+        o = _det(t, "depression", 1.0, 0.0)
+        o.extra["view_xy"] = [0.0, 0.0]
+        fid = m2.add(o)
+    assert not m2.is_real(fid)
+    o = _det(0.3, "depression", 1.0, 0.0)
+    o.extra["view_xy"] = [0.3, 0.0]
+    assert m2.is_real(m2.add(o))

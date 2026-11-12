@@ -98,6 +98,24 @@ class SpatialMemory:
                 return self._consolidate(keep)
         return fid
 
+    def _edge_span(self, e: dict[str, Any]) -> float:
+        ys = [y for o in e["observations"] for y in (o.get("extra") or {}).get("y_span", [])]
+        if ys:
+            return float(np.ptp(ys))
+        return max([o.get("extent_m") or 0.0 for o in e["observations"]] + [0.0])
+
+    def _hole_wall(self, eid: str, max_span: float = 0.8) -> str | None:
+        """A short edge (< max_span across the walk) inside a confirmed depression is that hole's far wall seen up
+        close, not a fault across the walk. Returns the depression's id, or None."""
+        e = self.findings[eid]
+        if self._edge_span(e) >= max_span:
+            return None
+        for did, d in self.findings.items():
+            if (d["kind"] == "depression" and d.get("n_detections", 0) >= 2
+                    and np.hypot(*(np.asarray(d["xy"]) - e["xy"])) < self._radius(d) + 0.1):
+                return did
+        return None
+
     def vote_shape(self, fid: str, shape: str | None, min_votes: int = 3, share: float = 0.7) -> str:
         """Record a step / pit shape vote (perception.classify_shape); relabel an edge <-> depression once the
         votes clearly disagree with the kind. Values measured under the old kind are discarded."""
@@ -148,10 +166,19 @@ class SpatialMemory:
         f["confidence"] = best_conf
         f["status"] = "measured" if best_conf >= 0.8 and f["value_spread_m"] < 0.005 else "uncertain"
 
-    def is_real(self, fid: str) -> bool:
-        """A finding counts once it was detected in at least two frames (single detections are usually noise) and
-        is not a side effect of a step edge."""
-        return self.findings[fid].get("n_detections", 0) >= 2 and self.explained_by(fid) is None
+    def is_real(self, fid: str, min_baseline: float = 0.15) -> bool:
+        """A finding counts once it was detected in at least two frames from viewpoints >= `min_baseline` apart
+        (single detections are usually noise, and a stereo camera's fixed-pattern error repeats identically while the
+        robot stands still) and is not a side effect of a step edge or a hole."""
+        f = self.findings[fid]
+        if f.get("n_detections", 0) < 2 or self.explained_by(fid) is not None:
+            return False
+        views = [o["extra"]["view_xy"] for o in f["observations"]
+                 if o["provenance"] == "detected" and "view_xy" in o.get("extra", {})]
+        if len(views) < 2:
+            return len(views) == 0  # observations without viewpoints (older callers, tests): frame count only
+        v = np.asarray(views)
+        return float(np.max(np.linalg.norm(v - v[0], axis=1))) >= min_baseline
 
     def explained_by(self, fid: str, near: float = 0.5, low_side: float = 0.65) -> str | None:
         """A depression or dropout right at a confirmed transverse edge is the edge's own footprint: the low side
@@ -159,14 +186,14 @@ class SpatialMemory:
         side (from the measured step sign), `near` on the other. Returns that edge's id, or None."""
         f = self.findings[fid]
         if f["kind"] == "edge":
-            return None
+            return self._hole_wall(fid)
         if f["kind"] == "dropout":  # the ground a deep hole's near wall hides from the camera
             for did, d in self.findings.items():
                 if (d["kind"] == "depression" and d.get("n_detections", 0) >= 2
                         and np.hypot(*(np.asarray(d["xy"]) - f["xy"])) < self._radius(d) + 0.2):
                     return did
         for eid, e in self.findings.items():
-            if e["kind"] != "edge" or e.get("n_detections", 0) < 2:
+            if e["kind"] != "edge" or e.get("n_detections", 0) < 2 or self._hole_wall(eid) is not None:
                 continue
             dx = f["xy"][0] - e["xy"][0]  # + = beyond the edge along the route
             v = e.get("value_m")
