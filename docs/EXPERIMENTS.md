@@ -957,3 +957,28 @@ Reading:
 - **All approach missions reached the goal.**
 - **Upheaval misses** are mostly small (1.7–2.3 cm) half-width faults.
 - **Puddles** are found from depth dropout alone; their depth is not measured (camera needed).
+
+### Crack width calibration on held-out seeds (2026-11-12)
+
+`scripts/crack_measurement_study.py --trials 24 --seed-offset 100` (`outputs/crack_study_24`). These are seeds disjoint
+from the 8-trial run the 2.2 px bias was fitted on. Median calibrated width [mm] (|error|):
+
+| crack width | D555 0.80 m | D555 1.20 m | D555 1.60 m | D405 0.52 m |
+|---|---|---|---|---|
+| 1 mm | 0.6 (0.4) | (4 % detected) | – | 1.0 (0.1) |
+| 2 mm | 2.1 (0.1) | 0.2 (1.8) | (8 % detected) | 2.0 (0.1) |
+| 3 mm | 3.3 (0.3) | 2.6 (0.4) | (21 % detected) | 3.0 (0.1) |
+| 5 mm | 5.3 (0.3) | 5.4 (0.4) | 1.7 (3.3) | 5.0 (0.1) |
+| 8 mm | 8.3 (0.3) | 8.3 (0.7) | 6.8 (1.2) | 8.0 (0.1) |
+| 13 mm | 13.0 (0.3) | 13.2 (0.3) | 11.8 (1.2) | 12.9 (0.1) |
+| 20 mm | 19.7 (0.5) | 18.9 (1.1) | 16.5 (3.5) | 19.2 (0.9) |
+
+- **Calibration generalises within 1.2 m:**
+  - D405 at stand-off: ±0.1 mm;
+  - D555 at 0.8 m: ±0.5 mm;
+  - D555 at 1.2 m: ±0.7 mm for cracks ≥ 3 mm.
+- **Beyond 1.6 m** the over-read is no longer constant in pixels (thin cracks fade below the threshold), so the
+  correction over-subtracts.
+- **The 13 mm ADA opening limit** is decided correctly from ≤ 1.2 m.
+- **Caveats:** synthetic, uniformly lit images. Real glare, shadows, wet concrete and motion blur will widen these
+  errors. The 2.2 px figure must be re-fitted on the real camera.
