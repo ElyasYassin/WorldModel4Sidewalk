@@ -31,14 +31,35 @@ from go2wm.scene.graph import graph_from_episode_meta  # noqa: E402
 from go2wm.sim.sensors import ELEV_GRID, grid_centres  # noqa: E402
 
 RES = 0.05
-COLORS = {"vertical_displacement": "#E03131", "running_slope": "#D6336C", "crack": "#FCC419", "curb_edge": "#22B8CF"}
+COLORS = {"vertical_displacement": "#E03131", "running_slope": "#D6336C", "crack": "#FCC419", "curb_edge": "#22B8CF",
+          "upheaval": "#FF6B6B", "hole": "#9775FA", "puddle": "#4DABF7", "obstruction": "#FF922B"}
 
 
 def graph_items(g) -> list[dict]:
     """Drawable scene-graph hazards (cross slope covers the whole walk and is reported in the title instead)."""
     items = []
+    defects = (g["meta"].get("terrain") or {}).get("defects") or []
     for h in g["hazards"]:
         t, b = h["type"], h["box"]
+        n = g["nodes"].get(h["id"], {})
+        if n.get("kind") == "defect" and n.get("defect"):  # explicit defects (sim/defects.py)
+            d = defects[int(h["id"].split("_")[1])]
+            if t in ("hole", "puddle", "obstruction"):
+                a = np.linspace(0, 2 * np.pi, 48)
+                rx, ry, ang = (d["rx"], d["ry"], d.get("angle", 0.0)) if t != "obstruction" else (d["r"], d["r"], 0.0)
+                u, v = rx * np.cos(a), ry * np.sin(a)
+                xy = (d["x"] + u * np.cos(ang) - v * np.sin(ang), d["y"] + u * np.sin(ang) + v * np.cos(ang))
+                lab = {"hole": f"hole {h.get('depth_m', 0) * 100:.0f} cm deep", "puddle": "puddle",
+                       "obstruction": d.get("kind", "object")}[t]
+            elif t == "upheaval":
+                xy = ([b[0], b[1], b[1], b[0], b[0]], [b[2], b[2], b[3], b[3], b[2]])
+                lab = f"upheaval +{h['lift_m'] * 100:.1f} cm"
+            else:  # open crack
+                pts = n["polyline"]
+                xy = ([q[0] for q in pts], [q[1] for q in pts])
+                lab = f"crack {h['width_m'] * 1000:.0f} mm"
+            items.append({"t": t, "box": b, "xy": xy, "label": lab, "ada": h["ada"], "lx": float(np.mean(xy[0]))})
+            continue
         if t == "vertical_displacement":
             items.append({"t": t, "box": b, "xy": ([h["xy"][0]] * 2, [b[2], b[3]]),
                           "label": f"{h['value_m'] * 100:+.1f} cm", "ada": h["ada"]})
@@ -120,8 +141,11 @@ def main() -> int:
                 continue
             c = COLORS[it["t"]]
             ls_ = "--" if it["t"] == "running_slope" else "-"
-            ax.plot(*it["xy"], color=c, lw=2.2 if it["t"] != "crack" else 1.6, ls=ls_)
-            if it["label"]:
+            ax.plot(*it["xy"], color=c, lw=1.6 if it["t"] == "crack" and "lx" not in it else 2.2, ls=ls_)
+            if it["label"] and "lx" in it:  # defects: label just above the defect
+                ax.text(it["lx"], it["box"][3] + 0.12, it["label"], color=c, fontsize=7.5, fontweight="bold", ha="center",
+                        bbox={"facecolor": "#14213D", "alpha": 0.75, "pad": 1.2, "edgecolor": "none"})
+            elif it["label"]:
                 lx = it["xy"][0][0] if it["t"] != "curb_edge" else x0 + 0.3
                 ly = label_y if it["t"] != "curb_edge" else it["xy"][1][0] - 0.35
                 if it["t"] == "running_slope":  # centre of the ramp box, below the step labels
@@ -132,8 +156,16 @@ def main() -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     writer = imageio.get_writer(str(out), fps=a.fps / a.stride * a.stride, codec="libx264", quality=8,
                                 macro_block_size=8)
-    fig = plt.figure(figsize=(16, 7.2), dpi=100)
     extent = (x0, x1, y0, y1)
+    if frames is None:  # no camera in this run: show the top-down appearance (the texture Isaac uses) instead
+        from go2wm.sim.sidewalk_texture import sidewalk_albedo
+
+        terrain = ((ep.meta.get("scene") or {}).get("params") or {}).get("terrain") or {}
+        top = sidewalk_albedo(XX, YY, terrain, seed=0)
+        span = (x1 - x0) / (y1 - y0)
+        fig = plt.figure(figsize=(16, min(12.0, 3 * 16 / span + 1.6)), dpi=100)
+    else:
+        fig = plt.figure(figsize=(16, 7.2), dpi=100)
     for t in range(T):
         for e in elevs:  # accumulate this frame's observed cells into the world map
             z = e[t].astype(np.float64)
@@ -153,15 +185,30 @@ def main() -> int:
         fused = np.where(cnt > 0, acc / np.maximum(cnt, 1), np.nan).reshape(XX.shape)
         seen = [bool(np.isfinite(fused[it["cells"]]).mean() >= 0.5) for it in items]
         fig.clf()
-        gs = fig.add_gridspec(2, 2, width_ratios=[0.75, 1.25], wspace=0.06, hspace=0.32,
-                              left=0.02, right=0.98, top=0.88, bottom=0.08)
-        ax0 = fig.add_subplot(gs[:, 0])
-        ax0.imshow(frames[min(t, len(frames) - 1)])
-        ax0.set_title("Front camera (simulated)", fontsize=12)
-        ax0.axis("off")
+        if frames is not None:
+            gs = fig.add_gridspec(2, 2, width_ratios=[0.75, 1.25], wspace=0.06, hspace=0.32,
+                                  left=0.02, right=0.98, top=0.88, bottom=0.08)
+            ax0 = fig.add_subplot(gs[:, 0])
+            ax0.imshow(frames[min(t, len(frames) - 1)])
+            ax0.set_title("Front camera (simulated)", fontsize=12)
+            ax0.axis("off")
+            slot = lambda k: gs[k - 1, 1]  # noqa: E731
+        else:
+            gs = fig.add_gridspec(3, 1, hspace=0.35, left=0.05, right=0.98, top=0.86, bottom=0.07)
+            ax0 = fig.add_subplot(gs[0])
+            ax0.imshow(top, origin="lower", extent=extent, interpolation="bilinear")
+            for ox, oy, orad in (ep.meta["scene"].get("obstacles") or []):
+                ax0.add_patch(plt.Circle((ox, oy), orad, color="#495057", alpha=0.9))
+            ax0.plot(pose[: t + 1, 0], pose[: t + 1, 1], color="white", lw=1.5)
+            ax0.arrow(pose[t, 0], pose[t, 1], 0.5 * np.cos(pose[t, 2]), 0.5 * np.sin(pose[t, 2]), width=0.06,
+                      color="#E8590C", length_includes_head=True)
+            ax0.set_title("Top-down appearance (texture; grey discs = obstacles; no camera in this run)", fontsize=12)
+            ax0.set_ylabel("y [m]", fontsize=9)
+            ax0.tick_params(labelsize=8)
+            slot = lambda k: gs[k]  # noqa: E731
         for k, (img, title) in enumerate(((shade(fused), f"Map from fused {' + '.join(n.replace('depth_', '').upper() for n in names)}"),
                                           (truth_rgb, "Ground truth surface + scene graph")), start=1):
-            ax = fig.add_subplot(gs[k - 1, 1])
+            ax = fig.add_subplot(slot(k))
             ax.imshow(img, origin="lower", extent=extent, interpolation="nearest")
             ax.plot(pose[: t + 1, 0], pose[: t + 1, 1], color="white", lw=1.5)
             hx, hy = np.cos(pose[t, 2]), np.sin(pose[t, 2])
@@ -184,7 +231,7 @@ def main() -> int:
                      f"median |map − truth| {np.median(err) * 100 if err.size else float('nan'):.1f} cm  ·  "
                      f"scene-graph hazards in sensor view {sum(seen)}/{len(items)}{cs}\n"
                      f"height colour, shaded (grey = not seen) · red = slab step (ADA level change) · pink = ramp · "
-                     f"yellow = crack · cyan = curb · white = path, orange = robot",
+                     f"yellow = crack · cyan = curb · coral = upheaval · purple = hole · blue = puddle · orange = obstruction · white = path",
                      fontsize=11)
         fig.canvas.draw()
         img = np.asarray(fig.canvas.buffer_rgba())[..., :3]

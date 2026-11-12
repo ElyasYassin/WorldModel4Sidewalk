@@ -90,3 +90,17 @@ def test_random_defect_tiles_deterministic_and_disjoint():
         for j in range(i + 1, len(boxes)):
             bi, bj = boxes[i], boxes[j]
             assert bi[1] < bj[0] or bj[1] < bi[0] or bi[3] < bj[2] or bj[3] < bi[2]
+
+
+def test_sidewalk_mission_scene_routes_around_obstructions():
+    from go2wm.mission.scene import sidewalk_mission_scene
+    from go2wm.planning.global_waypoints import GlobalPlanner
+
+    s = sidewalk_mission_scene({**TILE, "size": [24.0, 7.0]}, fixed_radius=0.3)
+    assert np.allclose(s.start, [-11.0, 0.0, 0.0]) and np.allclose(s.goal, [10.5, 0.0])
+    assert s.bounds[2] == -1.6 and s.bounds[3] == 1.6  # walkway half width 1.5 + 0.1 edge margin
+    # the bin reaches the walk (planned with the simulator's cylinder size); the tree on the verge does not
+    assert s.obstacles.shape == (1, 3) and np.allclose(s.obstacles[0], [12.0, 0.9, 0.3])
+    assert len(s.params["route"]) == 5 and s.params["route"][-1][0] == 10.5
+    wps = GlobalPlanner(0.1, 0.45, 1.0).plan(s, s.start[:2], s.goal)
+    assert len(wps) >= 2 and all(s.clearance(w, 0.3) > 0 for w in wps)

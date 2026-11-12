@@ -814,3 +814,28 @@ lateral commands. It stands still for small planar commands, including all turn-
   `tests/test_defects.py`.
 - **Next.** Isaac smoke test on these tiles (mesh build, texture, rough policy over upheavals and holes, obstacles
   from `obstacles_from_defects`, puddle dropout hooked into the sensor rig), then the mission scene and runner.
+
+## Phase 1, step 2: Isaac smoke test on defect tiles (2026-11-11)
+
+- **Setup.** `scripts\isaac_python.bat scripts\isaac_defect_smoke.py --use 3 4 5 --no-rgb` (seed-0 tiles from
+  `outputs/defect_tiles/tiles.json`, built side by side on the 2 cm / 1 mm grid). Mission scene
+  (`go2wm.mission.scene`): start x = −11, goal x = +10.5, walkway bounds, obstructions as 0.3 m cylinders standing
+  on the surface. Rough-terrain policy driven by the existing stack (A* + kinematic CEM-MPC + safety filter).
+  Holes, puddles, cracks and upheavals are deliberately not obstacles. D555 + L1 recorded with puddle dropout.
+  Data `data/go2_defect_smoke_norgb`, report `outputs/defect_smoke/report_norgb.json`,
+  videos `outputs/videos/12_defect_smoke_tile_9000{0,1,2}.mp4`.
+- **Result.** 3/3 tiles reached the goal (21.1–21.4 of 21.5 m in 31.2–31.6 s), no falls, no collisions; every
+  obstruction passed with ≥ 0.94 m centre distance (0.64 m clearance from the 0.3 m cylinder). The robot walked
+  over 6 upheavals (+1 to +8 cm), 2 holes and 2 puddles at 0.59–0.71 m/s without stalling. Foot slip near defects
+  is no higher than on plain walkway (p95 0.82–0.96 vs 0.96–1.17 m/s; the slip signal peaks at every touchdown);
+  the body dips by up to ~7 cm over holes and upheavals on tile 3 (height p5 0.31 vs 0.38 m). In puddles only
+  ~10 % of in-puddle map cells get a return per frame (dropout working). Fused-map error vs truth: median 0.1 cm;
+  11/13 scene-graph hazards come into sensor view on tile 5 (the two missed are 3 and 19 mm cracks).
+- **Rendering crash.** Two launches with the camera (`--rgb`, rendering experience) crashed at app start-up with an
+  access violation in the viewport's Hydra engine (`omni.kit.widget.viewport ... __enable_hydra_engine`), before any
+  project code ran; the same configuration worked on 2026-11-10/11 (E4-C). Without the camera the headless app
+  starts and runs. Not yet diagnosed (driver / display-state suspects); camera runs are needed for crack and puddle
+  detection.
+- **Limits.** Range sensors ray-cast only against the ground mesh (`mesh_prim_paths=["/World/ground"]`), so
+  obstructions are invisible to the D555/L1 maps; the planner knows them from the scene map. Obstacle cylinders are
+  one size (0.3 m). Per-region friction not modelled.

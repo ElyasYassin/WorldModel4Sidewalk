@@ -259,11 +259,16 @@ class IsaacGo2Adapter:
             raise ValueError(f"scene {scene.scene_id} has {len(obs_arr)} obstacles > {self.n_slots} slots")
         for i in range(self.n_slots):
             obj = self.uenv.scene[f"obstacle_{i}"]
+            z = self.cfg["obstacle_height"] / 2
             if i < len(obs_arr):
                 x, y = obs_arr[i, 0] + origin[0], obs_arr[i, 1] + origin[1]
+                if self.terrain:  # stand on the surface (world z of the surface = sidewalk_height, see _reset)
+                    from .terrain import sidewalk_height
+
+                    z += float(sidewalk_height(obs_arr[i, 0], obs_arr[i, 1], self.terrain))
             else:
                 x, y = PARK_XY[0] + 3 * i, PARK_XY[1]
-            pose = torch.tensor([[x, y, self.cfg["obstacle_height"] / 2, 1, 0, 0, 0]], device=self.uenv.device, dtype=torch.float32)
+            pose = torch.tensor([[x, y, z, 1, 0, 0, 0]], device=self.uenv.device, dtype=torch.float32)
             obj.write_root_pose_to_sim(pose)
 
     # --- SimulatorAdapter ------------------------------------------------
@@ -295,6 +300,13 @@ class IsaacGo2Adapter:
                 self.scene.obstacles = np.zeros((0, 3))
             if self.cfg.get("scene_bounds"):  # e.g. include the road beyond the curb (terrain runs only)
                 self.scene.bounds = tuple(float(v) for v in self.cfg["scene_bounds"])
+            if self.cfg.get("mission_scene"):  # Phase 1: start/goal/bounds/obstacles from the tile and its defects
+                from ..mission.scene import sidewalk_mission_scene
+
+                keep = {k: v for k, v in self.scene.params.items() if k != "terrain"}
+                self.scene = sidewalk_mission_scene(self.terrain, scene_id,
+                                                    fixed_radius=float(self.cfg["obstacle_radius"]))
+                self.scene.params.update(keep)
         torch.manual_seed(seed)
         self._rig_rng = np.random.default_rng(seed + 7_000_000)  # sensor noise / LiDAR directions per episode
         self.wrapped.reset()
@@ -477,6 +489,13 @@ class IsaacGo2Adapter:
         axis = R @ pitch_matrix(spec["pitch_deg"]) @ np.array([1.0, 0.0, 0.0])
         pts = corrupt_hits(starts, dirs, hits, spec, self._rig_rng, optical_axis_w=axis)
         o = self._origin()
+        if self.terrain and self.terrain.get("defects"):  # standing water is specular: many returns are lost
+            from .defects import range_dropout
+
+            ok = np.isfinite(pts[:, 0])
+            pd = range_dropout(pts[ok, 0] - o[0], pts[ok, 1] - o[1], self.terrain["defects"], spec["kind"])
+            lost = np.flatnonzero(ok)[self._rig_rng.uniform(size=ok.sum()) < pd]
+            pts[lost] = np.nan
         yaw = math.atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z))
         # z_ref 0: the generator only shifts tiles in x/y, so world z of the surface = terrain.sidewalk_height
         elev, cnt = bin_elevation(pts, o[:2] + st["pos"][:2], yaw, z_ref=0.0)
