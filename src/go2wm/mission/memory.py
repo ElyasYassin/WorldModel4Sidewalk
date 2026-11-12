@@ -111,7 +111,11 @@ class SpatialMemory:
         if self._edge_span(e) >= max_span:
             return None
         for did, d in self.findings.items():
-            if (d["kind"] == "depression" and d.get("n_detections", 0) >= 2
+            # the hole was seen many times from afar; its wall only up close (an upheaval's low-side pit is the
+            # other way round: fewer detections than the fault itself)
+            v = d.get("shape_votes", {"step": 0, "pit": 0})
+            if (d["kind"] == "depression" and d.get("n_detections", 0) >= max(2, e.get("n_detections", 0))
+                    and v["step"] <= v["pit"]  # its shape says step: it is the fault's footprint, not a hole
                     and np.hypot(*(np.asarray(d["xy"]) - e["xy"])) < self._radius(d) + 0.1):
                 return did
         return None
