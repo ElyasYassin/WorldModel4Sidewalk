@@ -135,9 +135,13 @@ def _box_median(a, r):
     return np.nanmedian(np.stack([pad[i : i + nx, j : j + ny] for i, j in offs]), axis=0)
 
 
-def measure_crack(ortho, res, dark_ratio: float = 0.8, min_px: int = 20, tile: float = 0.05):
-    """Width (median over 5 cm tiles of area / local length) and total length of the largest dark linear structure
-    in an orthorectified grey image. Returns None if nothing is detected."""
+def measure_crack(ortho, res, dark_ratio: float = 0.8, min_px: int = 20):
+    """Width and length of the largest dark linear structure in an orthorectified grey image (None if none).
+
+    Width from a distance transform: for every crack pixel, the distance to the nearest non-crack pixel; along the
+    centre line (local maxima) that distance is half the width (width = 2 d - 1 px, exact for odd pixel widths,
+    -1 px for even). Length = area / width. (A per-tile PCA extent counts the width into the length and
+    under-reads wide cracks.)"""
     from ..mission.perception import _clusters
 
     bg = _box_median(ortho, max(3, int(round(0.03 / res))))
@@ -146,20 +150,74 @@ def measure_crack(ortho, res, dark_ratio: float = 0.8, min_px: int = 20, tile: f
     if not comps:
         return None
     comp = max(comps, key=len)
-    P = comp * res
-    n = max(1, int(round(tile / res)))
-    keys = (comp // n)
-    widths, lengths = [], []
+    lo = comp.min(0) - 1
+    sub = np.zeros(tuple(comp.max(0) - lo + 2), bool)
+    sub[comp[:, 0] - lo[0], comp[:, 1] - lo[1]] = True
+    skel = _skeleton(sub)
+    w0 = len(comp) / max(_skel_length(skel), 1.0)  # first width guess (spurs make it low)
+    k = int(np.ceil(max(2.0, w0)))  # prune spurs shorter than ~ the width (jagged edges of a thick crack)
+    pruned = _prune(skel, k)
+    length_px = _skel_length(pruned) + (2 * k if pruned.any() else 0.0)  # pruning also shortened the two real ends
+    if not pruned.any():
+        length_px = _skel_length(skel)
+    width_px = len(comp) / max(length_px, 1.0)
+    return {"width_m": width_px * res, "length_m": length_px * res, "pixels": int(len(comp))}
+
+
+def _nb8(S: np.ndarray) -> np.ndarray:
+    P = np.pad(S, 1).astype(np.int8)
+    return sum(np.roll(np.roll(P, a, 0), b, 1) for a in (-1, 0, 1) for b in (-1, 0, 1) if (a, b) != (0, 0))[1:-1, 1:-1]
+
+
+def _prune(skel: np.ndarray, k: int) -> np.ndarray:
+    s = skel.copy()
+    for _ in range(k):
+        ends = s & (_nb8(s) <= 1)
+        if not ends.any():
+            break
+        s &= ~ends
+    return s
+
+
+def _skel_length(skel: np.ndarray, tile: int = 12) -> float:
+    """Centre-line length: in tiles of `tile` px, the extent of the skeleton pixels along their principal direction
+    (+1 px), summed. Robust to the 2-px staircases thinning leaves on diagonals (link counting over-reads those)."""
+    pts = np.argwhere(skel).astype(float)
+    if len(pts) < 2:
+        return float(len(pts))
+    keys = np.floor(pts / tile).astype(int)
+    total = 0.0
     for k in np.unique(keys, axis=0):
-        q = P[(keys == k).all(1)]
-        if len(q) < 4:
+        q = pts[(keys == k).all(1)]
+        if len(q) == 1:
+            total += 1.0
             continue
         c = q - q.mean(0)
-        evals, evecs = np.linalg.eigh(c.T @ c)
-        proj = c @ evecs[:, -1]
-        L = float(np.ptp(proj)) + res
-        widths.append(len(q) * res**2 / L)
-        lengths.append(L)
-    if not widths:
-        return None
-    return {"width_m": float(np.median(widths)), "length_m": float(np.sum(lengths)), "pixels": int(len(comp))}
+        _, v = np.linalg.eigh(c.T @ c)
+        total += float(np.ptp(c @ v[:, -1])) + 1.0
+    return total
+
+
+def _skeleton(img: np.ndarray) -> np.ndarray:
+    """Zhang-Suen thinning of a boolean image to one-pixel-wide centre lines."""
+    sk = np.pad(img.astype(bool), 1)
+    while True:
+        changed = False
+        for step in (0, 1):
+            P = sk.astype(np.int8)
+            n = [np.roll(np.roll(P, a, 0), b, 1) for a, b in ((1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (-1, 1), (0, 1), (1, 1))]
+            # neighbours P2..P9 clockwise from north (row - 1): roll by +1 shifts row r-1 into r
+            p2, p3, p4, p5, p6, p7, p8, p9 = n[0], n[7], n[6], n[5], n[4], n[3], n[2], n[1]
+            seq = [p2, p3, p4, p5, p6, p7, p8, p9, p2]
+            B = sum(seq[:8])
+            A = sum(((seq[i] == 0) & (seq[i + 1] == 1)).astype(np.int8) for i in range(8))
+            if step == 0:
+                cond = (p2 * p4 * p6 == 0) & (p4 * p6 * p8 == 0)
+            else:
+                cond = (p2 * p4 * p8 == 0) & (p2 * p6 * p8 == 0)
+            rm = sk & (B >= 2) & (B <= 6) & (A == 1) & cond
+            if rm.any():
+                sk = sk & ~rm
+                changed = True
+        if not changed:
+            return sk[1:-1, 1:-1]
