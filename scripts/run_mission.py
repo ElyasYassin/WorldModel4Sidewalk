@@ -36,6 +36,7 @@ def main() -> int:
     ap.add_argument("--planner", default="configs/planner.yaml")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="outputs/missions")
+    ap.add_argument("--overwrite", action="store_true", help="rerun missions that already have a result file")
     a = ap.parse_args()
     tiles = json.loads(resolve_path(a.tiles).read_text())
     pc = load_config(a.planner)
@@ -44,6 +45,10 @@ def main() -> int:
     summary = []
     for pol in a.policies:
         for ti in a.use:
+            done = out / f"{pol}_tile{ti}.json"
+            if done.exists() and not a.overwrite:  # resume: keep finished missions
+                summary.append(json.loads(done.read_text()))
+                continue
             sim = MockMissionSim(load_config("configs/mock.yaml"), tiles[ti])
             safety = SafetyFilter({**pc["safety"], "limits": pc["limits"], "robot_radius": pc["robot_radius"]})
             ctrl = MPCController(ModelPredictor(KinematicBaseline(1, "command")), pc, safety, a.seed, "kinematic_mpc")
