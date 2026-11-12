@@ -6,6 +6,10 @@ as in fused_sensor_maps). The right panel is the tile's exact surface. Both use 
 hill-shading so slab steps show as edges. Grey = not yet observed. The robot was driving a recorded command
 sequence; the map was not used for control.
 
+Scene graph (go2wm.scene.graph, built from the tile parameters = ground truth): its panel joints and hazards are drawn
+on the ground-truth panel; on the map panel a hazard is drawn once the sensors have covered at least half of its
+area ("in sensor view", not a detection: there is no detector yet).
+
   python scripts/render_sensor_map_video.py --episode data/go2_e4c_test/episodes/isaac_sidewalk_80039_s080039.npz
 """
 
@@ -23,9 +27,31 @@ from go2wm.common.config import resolve_path  # noqa: E402
 from go2wm.data.dataset import state_pose2d  # noqa: E402
 from go2wm.data.episodes import load_episode, load_rgb  # noqa: E402
 from go2wm.models.terrain_map import episode_height_fn  # noqa: E402
+from go2wm.scene.graph import graph_from_episode_meta  # noqa: E402
 from go2wm.sim.sensors import ELEV_GRID, grid_centres  # noqa: E402
 
 RES = 0.05
+COLORS = {"vertical_displacement": "#E03131", "running_slope": "#D6336C", "crack": "#FCC419", "curb_edge": "#22B8CF"}
+
+
+def graph_items(g) -> list[dict]:
+    """Drawable scene-graph hazards (cross slope covers the whole walk and is reported in the title instead)."""
+    items = []
+    for h in g["hazards"]:
+        t, b = h["type"], h["box"]
+        if t == "vertical_displacement":
+            items.append({"t": t, "box": b, "xy": ([h["xy"][0]] * 2, [b[2], b[3]]),
+                          "label": f"{h['value_m'] * 100:+.1f} cm", "ada": h["ada"]})
+        elif t == "running_slope":
+            items.append({"t": t, "box": b, "xy": ([b[0], b[1], b[1], b[0], b[0]], [b[2], b[2], b[3], b[3], b[2]]),
+                          "label": f"ramp {abs(h['value']) * 100:.0f} %", "ada": h["ada"]})
+        elif t == "crack":
+            pts = g["nodes"][h["id"]]["polyline"]
+            items.append({"t": t, "box": b, "xy": ([q[0] for q in pts], [q[1] for q in pts]), "label": "", "ada": h["ada"]})
+        elif t == "curb_edge":
+            items.append({"t": t, "box": [b[0], b[1], b[3] - 0.05, b[3]], "xy": ([b[0], b[1]], [b[3], b[3]]),
+                          "label": f"curb {h['value_m'] * 100:.0f} cm", "ada": h["ada"]})
+    return items
 
 
 def main() -> int:
@@ -78,6 +104,30 @@ def main() -> int:
         return rgb
 
     truth_rgb = shade(truth)
+    g = graph_from_episode_meta(ep.meta, x_range=(x0, x1))
+    items = graph_items(g) if g else []
+    for it in items:  # grid cells of each hazard's box, for the coverage test
+        b = it["box"]
+        jx = slice(max(0, int((b[0] - x0) / RES)), max(1, int(np.ceil((b[1] - x0) / RES))))
+        jy = slice(max(0, int((b[2] - y0) / RES)), max(1, int(np.ceil((b[3] - y0) / RES))))
+        it["cells"] = (jy, jx)
+    joints = sorted({n["box"][0] for n in (g["nodes"].values() if g else []) if n["kind"] == "panel"})[1:]
+    cross = g["nodes"]["walkway"] if g else None
+
+    def draw_graph(ax, show, label_y):
+        for it, on in zip(items, show):
+            if not on:
+                continue
+            c = COLORS[it["t"]]
+            ls_ = "--" if it["t"] == "running_slope" else "-"
+            ax.plot(*it["xy"], color=c, lw=2.2 if it["t"] != "crack" else 1.6, ls=ls_)
+            if it["label"]:
+                lx = it["xy"][0][0] if it["t"] != "curb_edge" else x0 + 0.3
+                ly = label_y if it["t"] != "curb_edge" else it["xy"][1][0] - 0.35
+                if it["t"] == "running_slope":  # centre of the ramp box, below the step labels
+                    lx, ly = 0.5 * (it["box"][0] + it["box"][1]), label_y - 0.55
+                ax.text(lx, ly, it["label"], color=c, fontsize=8, fontweight="bold", ha="center" if it["t"] != "curb_edge" else "left",
+                        bbox={"facecolor": "#14213D", "alpha": 0.75, "pad": 1.5, "edgecolor": "none"})
     out = resolve_path(a.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     writer = imageio.get_writer(str(out), fps=a.fps / a.stride * a.stride, codec="libx264", quality=8,
@@ -101,6 +151,7 @@ def main() -> int:
         if t % a.stride:
             continue
         fused = np.where(cnt > 0, acc / np.maximum(cnt, 1), np.nan).reshape(XX.shape)
+        seen = [bool(np.isfinite(fused[it["cells"]]).mean() >= 0.5) for it in items]
         fig.clf()
         gs = fig.add_gridspec(2, 2, width_ratios=[0.75, 1.25], wspace=0.06, hspace=0.32,
                               left=0.02, right=0.98, top=0.88, bottom=0.08)
@@ -109,12 +160,18 @@ def main() -> int:
         ax0.set_title("Front camera (simulated)", fontsize=12)
         ax0.axis("off")
         for k, (img, title) in enumerate(((shade(fused), f"Map from fused {' + '.join(n.replace('depth_', '').upper() for n in names)}"),
-                                          (truth_rgb, "Ground truth surface")), start=1):
+                                          (truth_rgb, "Ground truth surface + scene graph")), start=1):
             ax = fig.add_subplot(gs[k - 1, 1])
             ax.imshow(img, origin="lower", extent=extent, interpolation="nearest")
             ax.plot(pose[: t + 1, 0], pose[: t + 1, 1], color="white", lw=1.5)
             hx, hy = np.cos(pose[t, 2]), np.sin(pose[t, 2])
             ax.arrow(pose[t, 0], pose[t, 1], 0.5 * hx, 0.5 * hy, width=0.06, color="#E8590C", length_includes_head=True)
+            if k == 2:  # scene graph on the ground truth: faint panel joints + every hazard
+                for jx_ in joints:
+                    ax.axvline(jx_, color="white", lw=0.6, alpha=0.35)
+                draw_graph(ax, [True] * len(items), y1 - 0.35)
+            else:
+                draw_graph(ax, seen, y1 - 0.35)
             ax.set_title(title, fontsize=12)
             ax.set_ylabel("y [m]", fontsize=9)
             if k == 2:
@@ -122,10 +179,12 @@ def main() -> int:
             ax.tick_params(labelsize=8)
         obs = np.isfinite(fused)
         err = np.abs(fused - truth)[obs]
+        cs = f" · cross slope {abs(cross['cross_slope']) * 100:.1f} % (ADA {cross['ada']})" if cross else ""
         fig.suptitle(f"t = {t * 0.1:4.1f} s  ·  mapped {obs.mean() * 100:4.1f} % of the area  ·  "
-                     f"median |map − truth| {np.median(err) * 100 if err.size else float('nan'):.1f} cm\n"
-                     f"colour = ground height ({vmin * 100:.0f} to {vmax * 100:.0f} cm, shaded so slab steps show as "
-                     f"edges) · grey = not seen yet · white = path · orange = robot heading · {ep.episode_id}",
+                     f"median |map − truth| {np.median(err) * 100 if err.size else float('nan'):.1f} cm  ·  "
+                     f"scene-graph hazards in sensor view {sum(seen)}/{len(items)}{cs}\n"
+                     f"height colour, shaded (grey = not seen) · red = slab step (ADA level change) · pink = ramp · "
+                     f"yellow = crack · cyan = curb · white = path, orange = robot",
                      fontsize=11)
         fig.canvas.draw()
         img = np.asarray(fig.canvas.buffer_rgba())[..., :3]
