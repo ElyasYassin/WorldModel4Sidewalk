@@ -28,11 +28,14 @@ from go2wm.common.schema import VelocityCommand
 class PlannerCommands:
     """Command function for collect_episodes: A* waypoints + any local controller (act(obs, waypoint))."""
 
-    def __init__(self, nav_cfg: dict, controller, robot_radius: float, dt: float):
+    def __init__(self, nav_cfg: dict, controller, robot_radius: float, dt: float, on_step=None):
         self.nc, self.ctrl, self.rr, self.dt = nav_cfg, controller, robot_radius, dt
         self.tracker = None
+        self.on_step = on_step  # called with the observation before every command (e.g. grab a video frame)
 
     def __call__(self, obs, scene) -> VelocityCommand:
+        if self.on_step is not None:
+            self.on_step(obs)
         from go2wm.planning.global_waypoints import GlobalPlanner, WaypointTracker
 
         if self.tracker is None:
@@ -72,6 +75,25 @@ def defect_report(ep, defects) -> list[dict]:
     return out
 
 
+def write_follow_video(frames, episode_id: str, tile: int, out_dir) -> object:
+    import imageio.v2 as imageio
+    from PIL import Image, ImageDraw
+
+    out = out_dir / f"follow_{episode_id}.mp4"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    w = imageio.get_writer(str(out), fps=10, codec="libx264", quality=8, macro_block_size=8)
+    for k, (f, pose) in enumerate(frames):
+        im = Image.fromarray(f)
+        d = ImageDraw.Draw(im)
+        d.rectangle([8, 8, 760, 58], fill=(20, 33, 61))
+        d.text((16, 14), f"defect tile {tile} · A* + MPC, rough-terrain Go2 policy (Isaac Lab)", fill=(246, 245, 240))
+        d.text((16, 34), f"t = {k * 0.1:5.1f} s   x = {pose[0]:+6.2f} m   y = {pose[1]:+5.2f} m", fill=(242, 166, 90))
+        w.append_data(np.asarray(im))
+    w.close()
+    print(f"[defect-smoke] wrote {out} ({len(frames)} frames)", flush=True)
+    return out
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--tiles", default="outputs/defect_tiles/tiles.json")
@@ -82,14 +104,19 @@ def main(argv=None) -> int:
     ap.add_argument("--seed", type=int, default=90000)
     ap.add_argument("--data", default="data/go2_defect_smoke")
     ap.add_argument("--out", default="outputs/defect_smoke/report.json")
-    ap.add_argument("--no-rgb", action="store_true", help="no camera / texture (headless app without rendering)")
+    ap.add_argument("--no-rgb", action="store_true", help="no onboard camera (the texture is kept only with --video)")
+    ap.add_argument("--video", action="store_true", help="also record a 3D follow-camera video per tile (1280 x 720)")
+    ap.add_argument("--eye", type=float, nargs=3, default=[-2.6, -1.3, 1.2], help="follow camera offset [m]")
     args = ap.parse_args(argv)
     all_tiles = json.loads(resolve_path(args.tiles).read_text())
     tiles = [all_tiles[i] for i in args.use]
     cfg = copy.deepcopy(load_config(args.config))
     cfg["isaac"].update(families=["sidewalk"], terrain_tiles=tiles, mission_scene=True, scene_obstacles=True,
                         sensor_rig=["depth_d555", "l1"], rgb_camera=not args.no_rgb,
-                        terrain_texture=None if args.no_rgb else {"res": 0.02}, record_height_scan=False)
+                        terrain_texture=None if (args.no_rgb and not args.video) else {"res": 0.02},
+                        record_height_scan=False)
+    if args.video:
+        cfg["isaac"].update(enable_cameras=True, video={"resolution": [1280, 720], "eye": args.eye, "lookat": [1.6, 0.0, 0.0]})
     pc = load_config(args.planner)
 
     from go2wm.data.episodes import load_episode
@@ -108,7 +135,18 @@ def main(argv=None) -> int:
             safety = SafetyFilter({**pc["safety"], "limits": pc["limits"], "robot_radius": pc["robot_radius"]})
             ctrl = MPCController(ModelPredictor(KinematicBaseline(1, "command"), pc["mpc"].get("device", "cpu")),
                                  pc, safety, seed, "kinematic_mpc")
-            gen = PlannerCommands(pc["navigation"], ctrl, pc["robot_radius"], sim.control_dt)
+            frames: list = []
+
+            def grab(obs, frames=frames):
+                f = sim.render_rgb()
+                for _ in range(4):  # the renderer occasionally returns an all-black frame
+                    if np.asarray(f)[..., :3].mean() > 2:
+                        break
+                    f = sim.render_rgb()
+                frames.append((np.asarray(f)[..., :3].copy(), obs.pose2d.copy()))
+
+            gen = PlannerCommands(pc["navigation"], ctrl, pc["robot_radius"], sim.control_dt,
+                                  on_step=grab if args.video else None)
             ids = collect_episodes(sim, root, num_episodes=1, base_seed=seed, max_steps=args.max_steps,
                                    limits=pc["limits"], goal_tolerance_m=pc["navigation"]["goal_tolerance"],
                                    scene_ids=[f"sidewalk_{seed:05d}"], command_fn_factory=lambda s, g=gen: g,
@@ -122,6 +160,8 @@ def main(argv=None) -> int:
                    "n_obstacles": len(sc["obstacles"]), "obstacle_placement_max_err_m": sc["params"].get("obstacle_placement_max_err_m"),
                    "defects": defect_report(ep, tiles[j]["defects"])}
             report["episodes"].append(rec)
+            if args.video and frames:
+                rec["video"] = str(write_follow_video(frames, ids[0], ti, resolve_path(args.out).parent))
             print(f"[defect-smoke] tile {ti}: {rec['outcome']} after {rec['time_s']:.1f} s, "
                   f"progress {rec['progress_x_m']:.1f}/{rec['route_x_m']:.1f} m", flush=True)
             write_json(resolve_path(args.out), report)  # incremental: survives a killed run

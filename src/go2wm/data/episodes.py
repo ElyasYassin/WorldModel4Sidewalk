@@ -38,12 +38,14 @@ ARRAY_SPEC: dict[str, tuple[str, str]] = {
 }
 # E4-C sensor rig (go2wm.sim.sensors): per frame, a robot-centred yaw-aligned elevation grid [T+1, nx, ny]
 # (mean hit height, scene frame, NaN = no hit) and hit count; grid and device specs in meta.simulator.sensor_rig
-RANGE_SENSORS = ("depth_d435", "depth_d555", "l1", "mid360", "mid360_tilt")
-for _s in RANGE_SENSORS:
+RANGE_SENSORS = ("depth_d435", "depth_d555", "l1", "mid360", "mid360_tilt")  # the E4-C comparison set
+NEAR_SENSORS = ("depth_d405",)  # close-range measurement sensors (Phase 1)
+RECORDABLE_SENSORS = RANGE_SENSORS + NEAR_SENSORS
+for _s in RECORDABLE_SENSORS:
     ARRAY_SPEC[f"sensor_{_s}_elev_m"] = ("float16", "obs")
     ARRAY_SPEC[f"sensor_{_s}_count"] = ("uint8", "obs")
 TERRAIN_GT = ("gt_height_above_ground_m", "gt_ground_z_m", "gt_foot_contact", "gt_foot_slip_m_s")
-SENSOR_ARRAYS = ("scan_height_m", *(f"sensor_{s}_{k}" for s in RANGE_SENSORS for k in ("elev_m", "count")))
+SENSOR_ARRAYS = ("scan_height_m", *(f"sensor_{s}_{k}" for s in RECORDABLE_SENSORS for k in ("elev_m", "count")))
 OPTIONAL_ARRAYS = {"gt_clearance_m", "distance_to_goal_m", "progress_to_waypoint_m", *TERRAIN_GT, *SENSOR_ARRAYS}
 
 

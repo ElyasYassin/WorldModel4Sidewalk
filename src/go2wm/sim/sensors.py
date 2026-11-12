@@ -10,6 +10,10 @@ per 5 cm cell + hit count), which is what is recorded (raw point clouds would be
   depth_d555   RealSense D555-like (95 mm baseline, D450 optics, as D455): same mount and FOV, 0.52-6 m
                (datasheet ideal range 0.6-6 m; ~0.52 m min-z at full resolution), half the D435 noise
                (sigma(z) = 2 mm + 2.5 mm * z^2, i.e. <~1 % at 4 m; D455 is quoted <2 % at 4 m), 3 % dropout
+  depth_d405   RealSense D405-like close-range stereo (18 mm baseline, no projector): on the chin, pitched 60 deg
+               down so it looks at the ground ~0.3-0.75 m ahead of the base; 87 x 58 deg, 0.07-0.5 m (datasheet ideal
+               range 7-50 cm), sigma(z) = 0.2 mm + 4 mm * z^2 (~0.5 mm at 25 cm, ~1.2 mm at 50 cm), 3 % dropout.
+               Legs are not ray-cast: the front feet that swing through its view are not modelled.
   l1           Unitree L1-like (stock Go2 Pro/EDU): 360 x 90 deg dome whose axis points forward, 15 deg
                down, under the head; 21.6 k pts/s -> 2160 per 0.1 s, non-repetitive (fresh random
                directions every frame), 0.05-30 m, sigma 2 cm
@@ -43,6 +47,10 @@ SENSOR_SPECS: dict[str, dict[str, Any]] = {
                    "vfov_deg": 58.0, "width": 106, "height": 60, "range_m": [0.52, 6.0],
                    "noise": {"model": "depth_quadratic", "a": 0.002, "b": 0.0025}, "dropout": 0.03,
                    "device": "Intel RealSense D555 (approx.: 95 mm baseline like D455; no official RMS figure)"},
+    "depth_d405": {"kind": "pinhole", "mount_pos": [0.33, 0.0, -0.03], "pitch_deg": 60.0, "hfov_deg": 87.0,
+                   "vfov_deg": 58.0, "width": 106, "height": 60, "range_m": [0.07, 0.5],
+                   "noise": {"model": "depth_quadratic", "a": 0.0002, "b": 0.004}, "dropout": 0.03,
+                   "device": "Intel RealSense D405 (approx.: 18 mm baseline, close range)"},
     "l1": {"kind": "dome", "mount_pos": [0.28, 0.0, -0.02], "pitch_deg": 15.0, "n_rays": 2160, "range_m": [0.05, 30.0],
            "noise": {"model": "range_gaussian", "sigma": 0.02}, "dropout": 0.01, "device": "Unitree L1 4D LiDAR (approx.)"},
     "mid360": {"kind": "band", "mount_pos": [-0.05, 0.0, 0.12], "pitch_deg": 0.0, "elev_deg": [-7.0, 52.0],
