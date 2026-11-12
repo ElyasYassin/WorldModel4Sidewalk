@@ -752,3 +752,39 @@ lateral commands. It stands still for small planar commands, including all turn-
 
 - Training: `scripts\e4c_train_queue.ps1 -Models depth_d555_k10_gru,depth_d435_k10_gru,l1_k10_gru,mid360_tilt_k10_gru,depth_d555_l1_k10_gru`
   (5 × 3 seeds).
+
+## E4-C (3) + E5 results: fused sensor maps and pretrained models (2026-11-11, parked after this)
+
+- **Setup.** Same protocol as E4-C (2): `data/go2_e4c_train` (manifest `e4`), 3 seeds per model, final test
+  `data/go2_e4c_test` (48 episodes, 6 unseen tiles), evaluated together with the no-terrain GRU and perfect-map
+  references. `outputs/e5/final_test/{prediction_metrics,seed_summary}.json`;
+  `python scripts/summarize_seeds.py outputs/e5/final_test/prediction_metrics.json --ref e4c_gru`.
+- **Position error at 3 s (m, seed mean ± sd)** and gain over the GRU on step windows (39 episodes):
+
+| model | 3 s overall | step, 2 s | step, 3 s |
+|---|---|---|---|
+| GRU, no terrain | 0.180 ± 0.005 | – | – |
+| perfect map | **0.154** ± 0.006 | −0.027 | −0.052 |
+| D555 @10 frames | 0.165 ± 0.005 | −0.007 [−0.012, +0.002] | −0.019 [−0.031, −0.003] |
+| D435 @10 | 0.168 ± 0.005 | −0.004 | −0.014 |
+| L1 @10 | 0.165 ± 0.001 | −0.001 | −0.016 |
+| Mid-360 tilted @10 | 0.169 ± 0.002 | +0.004 | −0.001 |
+| D555 + L1 @10 | 0.165 ± 0.005 | −0.001 [−0.008, +0.007] | −0.016 [−0.025, −0.000] |
+| DINOv2-small CLS + mean (A1) | 0.333 ± 0.010 | +0.192 | +0.341 |
+| DINOv2-small 2 × 2 grid (A1) | 0.331 ± 0.002 | +0.209 | +0.348 |
+| D555 + L1 @10 + DINOv2 grid | 0.294 ± 0.024 | +0.155 | +0.273 |
+| Depth Anything, calibrated @10 (C) | 0.180 ± 0.003 | +0.003 | +0.004 |
+| kinematics | 0.478 | | |
+
+- **Findings.**
+  - Fusing 1 s of frames turns the sensor maps from no help (single frame, E4-C 2) into a real gain: 3 s error
+    0.165–0.169 m vs 0.180 m, about 45–60 % of the perfect map's overall gain. On steps the gain is about a third
+    of the perfect map's at 3 s, and within seed noise at 2 s. Adding the L1 to the D555 does not improve prediction,
+    although it makes the map more accurate under the robot.
+  - **Frozen DINOv2 image features make prediction much worse on unseen tiles** (0.33 m vs 0.18 m at 3 s), most of
+    all on steps, and they spoil the fused map as well. The likely cause is overfitting: with 12 training tiles, the
+    model can key on tile appearance, which does not transfer. Not checked on dev-test before parking.
+  - Calibrated monocular depth (Depth Anything) adds nothing, consistent with its 5–20 cm map error (E5 map check).
+- **Status.** Parked on 2026-11-11 when the project was repositioned on the Phase 1 inspection demo. What carries
+  over: the fused D555 + L1 map is the sensor map for Phase 1 perception (accuracy: E4-C (1) and (3)); pretrained
+  image features need far more tile variety, regularization or a different design before they are worth revisiting.
