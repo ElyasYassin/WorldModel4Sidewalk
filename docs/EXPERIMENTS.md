@@ -839,3 +839,70 @@ lateral commands. It stands still for small planar commands, including all turn-
 - **Limits.** Range sensors ray-cast only against the ground mesh (`mesh_prim_paths=["/World/ground"]`), so
   obstructions are invisible to the D555/L1 maps; the planner knows them from the scene map. Obstacle cylinders are
   one size (0.3 m). Per-region friction not modelled.
+
+## Phase 1, step 3: crack measurement from the colour cameras (2026-11-11)
+
+`scripts/crack_measurement_study.py --trials 8` (`outputs/crack_study`). Synthetic images (`go2wm.sim.synthetic_camera`:
+true-width crack texture, 2x supersampled, 0.8 px blur, noise, 8-bit) of a random ~0.5 m crack on plain concrete,
+orthorectified with the known camera geometry and measured without ground truth: Zhang–Suen skeleton, pruned
+centre line, length = tile-PCA centre-line length, width = dark area / length. Appearance only (no lighting, glare or
+motion blur), so these numbers are optimistic.
+
+Cell: detected % · median width estimate [mm] (|error|) · median length error %
+
+| crack width | D555 RGB 0.80 m (1.09 mm/px) | D555 RGB 1.20 m (2.24 mm/px) | D555 RGB 1.60 m (3.60 mm/px) | D555 RGB 2.00 m (5.14 mm/px) | D405 RGB 0.52 m (0.54 mm/px) |
+|---|---|---|---|---|---|
+| 1 mm | 100 % · 3.0 (2.0) · 0 % | 0 % | 0 % | 0 % | 100 % · 2.2 (1.2) · 1 % |
+| 2 mm | 100 % · 4.8 (2.8) · 0 % | 100 % · 5.3 (3.3) · 5 % | 0 % | 0 % | 100 % · 3.2 (1.2) · 0 % |
+| 3 mm | 100 % · 5.9 (2.9) · 1 % | 100 % · 7.5 (4.5) · 1 % | 0 % | 0 % | 100 % · 4.3 (1.3) · 0 % |
+| 5 mm | 100 % · 8.0 (3.0) · 1 % | 100 % · 10.6 (5.6) · 2 % | 88 % · 10.0 (5.0) · 26 % | 0 % | 100 % · 6.3 (1.3) · 1 % |
+| 8 mm | 100 % · 10.7 (2.7) · 1 % | 100 % · 13.3 (5.3) · 1 % | 100 % · 14.8 (6.8) · 2 % | 38 % · 14.4 (6.4) · 2 % | 100 % · 9.1 (1.1) · 3 % |
+| 13 mm | 100 % · 15.7 (2.7) · 2 % | 100 % · 18.5 (5.5) · 2 % | 100 % · 19.4 (6.4) · 2 % | 100 % · 17.6 (4.6) · 3 % | 100 % · 14.2 (1.2) · 2 % |
+| 20 mm | 100 % · 22.7 (2.7) · 3 % | 100 % · 24.4 (4.4) · 3 % | 100 % · 25.2 (5.2) · 2 % | 100 % · 23.9 (3.9) · 3 % | 100 % · 20.8 (0.8) · 4 % |
+
+- **Length** is good wherever the crack is detected (≤ 5 % error, except 5 mm cracks at 1.6 m).
+- **Detection:** the D555 sees 1 mm cracks only at 0.8 m and 2–3 mm cracks out to 1.2 m. The D405 at its stand-off sees all widths.
+- **Width** is over-read by a nearly constant ~2.2 image pixels at ≤ 1.2 m (blur, bilinear orthorectification, dark
+  threshold), i.e. +2.7 mm on the D555 at 0.8 m and +1.2 mm on the D405. Because it is constant in pixels it can be
+  calibrated: `BIAS_PX = 2.2` (fitted on this run); the 24-trial run uses disjoint seeds (`--seed-offset 100`) and reports
+  raw and calibrated width.
+- **Crack depth is not measurable** with either sensor for sub-cm cracks. The D405 depth (~0.5 mm footprint, 0.1–0.3 mm
+  step precision) resolves the depth of cracks wider than a few mm only.
+
+## Phase 1, step 4: strategy loop, perception fixes and the inspection report (2026-11-11/12)
+
+Mock kinematic missions (`scripts/run_mission.py`, `--workers` for parallel runs) with live D555 + D405 from the offline
+rig, detection → spatial memory → measurement, three strategies (walkover / slow / approach to a D405 stand-off).
+
+**Bugs found while building the report, fixed (all earlier mission numbers are void):**
+- **Flying pixels wrapped around the image border** (`np.roll`): the nearest image row was averaged with the farthest,
+  giving ~7 cm ghost pits at ~1.5 m whenever the robot yawed (tile 0 walkover: 23 false findings). This also affected
+  the realistic profile of the sensor error study and the near/far step study, which are rerun (`outputs/*_v2`).
+- **The offline rig had no puddle dropout** (only the Isaac rig had it): puddles were invisible wide shallow dips → 0/3
+  found. Now applied as in Isaac (85 % of pinhole returns lost on water).
+- **Detector:**
+  - clusters at the same distance spread ≥ 0.6 m across the walk form one transverse edge;
+  - compact raised clusters are the far wall of a hole (a depression), not an edge;
+  - strong 2-cell clusters are accepted far away;
+  - detection runs every step.
+- **Memory:**
+  - overlapping findings are consolidated (aliases for policy targets);
+  - depressions aligned across the walk are relabelled as an edge;
+  - an edge's footprint (its low side and the ground it occludes) and a deep hole's shadow dropout merge into it;
+  - puddle dropouts group within 0.9 m.
+- **Scoring:**
+  - step error is compared by magnitude (the sign depends on the viewing side);
+  - depressions on cracks deep/wide enough for depth are counted as crack findings, not false ones.
+
+Dev tiles (the 6 tiles the fixes were developed on, realistic profile): walkover 0 false findings, all upheavals,
+holes and puddles found except one hole at the curb edge (y = 1.32 on a 3.1 m walk); approach 2 false findings.
+Held-out evaluation: 24 new tiles (`outputs/defect_tiles_eval`, seed 100), realistic and pessimistic profiles
+(overnight queue `scripts/phase1_overnight.ps1`).
+
+**Inspection report** (`scripts/inspection_report.py`, `go2wm.mission.report`): HTML + Markdown + JSON per mission,
+built only from the robot's memory. It contains:
+- per finding: location, measured value (± spread), ADA 303 class (ok / bevel / violation, or unverified for
+  dropouts), status, best sensor, detection and measurement counts, recommended action;
+- a synthetic camera evidence crop rendered at the recorded pose of the best observation;
+- a route map with the findings;
+- a separate ground-truth appendix for evaluation.
