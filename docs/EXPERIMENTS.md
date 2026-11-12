@@ -1039,3 +1039,31 @@ close-range evidence*; under worse sensors it is also *the only strategy that ke
 The v2 rules remove most of approach's false findings without hurting walkover. Approach's hole recall on this set
 stays at 18/26, against 22 for walkover. The lower walkover precision on seed 300 (91 %) is tile-set variance, not a v2
 regression.
+
+## Phase 1, step 6: Isaac physics missions and measured-vs-true (2026-11-12)
+
+New: `PoseErrors` in `mission/runner.py` (odometry drift scaled by distance + camera-IMU latency, default 20 ms), off
+by default so the frozen evaluations reproduce exactly (checked on seed-300 tile 8). `scripts/isaac_mission.py` runs the
+same mission loop on Isaac Go2 physics (rough-terrain policy, cameras off: works on the 610.88 driver) and records all
+link poses; `scripts/render_isaac_mission.py` (separate env `D:/go2wm/render_env`, pyvista) renders a 3D chase view
+with measured-vs-true labels. `scripts/measurement_comparison.py` plots every defect, not medians.
+
+### What the real gait exposed (tile 8, seed 300; mock never showed these)
+- Approach in the mock assumed the robot arrives facing +x. In Isaac it arrived ~30-60 deg off and wandered until the
+  budget expired (approach aborted). Then it stalled 0.17 m short: the policy's dead zone (E1r) ignores the MPC's small
+  commands near the waypoint. Fix (Isaac runs only, `Policy(align=True, reach=0.10)`): direct body-frame command
+  floored at 0.35 m/s for the last 0.4 m, turn in place (>= 0.6 rad/s) to face the finding.
+- After an aborted approach the robot resumed the route offset toward the 7 cm hole and **fell in**. Holes were never
+  planner obstacles. Fix (`Policy(avoid_holes=True)`): confirmed holes deeper than 3 cm become A* keep-out circles
+  (planner only) and the route is replanned when the set changes.
+- Walk past with the real gait: the 65 mm upheaval read as 15 mm (first run) / 41 mm (second run). Stop & look:
+  65.6 mm (D405), hole 71.7 vs 70.0 mm. Videos: `outputs/videos/14_isaac_{walkover,approach}_tile8.mp4`.
+
+### Measured vs true, every defect (seed 300, mock kinematics; `outputs/measurement_comparison`)
+Medians were 1-2 mm, but the tails are not small: p90 6-25 mm. Systematic failures:
+- Deep holes (> 10 cm) under-read by 25-70 mm in ~1 in 8 cases: the camera cannot see the bottom from the stand-off.
+- An upheaval on a running-slope ramp (tile 22) read 185-201 mm against 62 mm (realistic); the step measurement
+  includes the grade. Not fixed (final set).
+- Pessimistic sensors + pose errors: walk past upheaval median 5.7 mm, p90 27.5 mm; stop & look median 0.6 mm,
+  p90 25 mm; false findings 0.67 per mission (approach, was 0.29 without pose errors in realistic).
+- ADA class agreement 90-100 % is weak evidence: the test tiles have no upheaval under 10 mm or hole under 20 mm.

@@ -34,7 +34,8 @@ def one_mission(job):
     sim = MockMissionSim(load_config("configs/mock.yaml"), tile)
     safety = SafetyFilter({**pc["safety"], "limits": pc["limits"], "robot_radius": pc["robot_radius"]})
     ctrl = MPCController(ModelPredictor(KinematicBaseline(1, "command")), pc, safety, a["seed"], "kinematic_mpc")
-    res = run_mission(sim, ctrl, tile, Policy(pol), a["profile"], seed=a["seed"] + ti, log=lambda *x: None)
+    res = run_mission(sim, ctrl, tile, Policy(pol), a["profile"], seed=a["seed"] + ti, log=lambda *x: None,
+                      pose_errors=a.get("pose_errors", False))
     res["score"] = score_mission(res, tile)
     res["tile"] = ti
     (Path(a["out"]) / f"{pol}_tile{ti}.json").write_text(json.dumps(res, default=float))
@@ -54,13 +55,14 @@ def main() -> int:
     ap.add_argument("--planner", default="configs/planner.yaml")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="outputs/missions")
+    ap.add_argument("--pose-errors", action="store_true", help="odometry drift + camera latency in perception")
     ap.add_argument("--overwrite", action="store_true", help="rerun missions that already have a result file")
     ap.add_argument("--workers", type=int, default=1, help="missions run in parallel processes")
     a = ap.parse_args()
     tiles = json.loads(resolve_path(a.tiles).read_text())
     out = resolve_path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    cfg = {"planner": a.planner, "seed": a.seed, "profile": a.profile, "out": str(out)}
+    cfg = {"planner": a.planner, "seed": a.seed, "profile": a.profile, "out": str(out), "pose_errors": a.pose_errors}
     done, jobs = {}, []
     for pol in a.policies:
         for ti in a.use:

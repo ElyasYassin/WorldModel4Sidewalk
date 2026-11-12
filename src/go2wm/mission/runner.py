@@ -56,10 +56,51 @@ class MockMissionSim(MockGo2Sim):
         return o
 
 
+class PoseErrors:
+    """Online pose errors for the perception pipeline (off by default; the frozen evaluations ran without them).
+
+    odometry   the robot's (x, y, yaw) estimate drifts as a random walk scaled by distance moved (profile odom_xy,
+               odom_yaw per metre), like legged odometry without loop closure
+    latency    each depth frame is captured `latency_s` before the pose it is stamped with (camera-IMU sync error):
+               the rays leave the earlier true pose, the robot places the points with the current estimate
+    """
+
+    def __init__(self, prof: dict[str, float], seed: int, latency_s: float | None = None):
+        self.p, self.rng = prof, np.random.default_rng(seed + 31337)
+        self.latency_s = float(prof.get("latency_s", 0.02) if latency_s is None else latency_s)
+        self.err = np.zeros(3)
+        self.last = None
+
+    def estimate(self, pose: np.ndarray) -> np.ndarray:
+        if self.last is not None:
+            d = float(np.linalg.norm(pose[:2] - self.last[:2]))
+            self.err[:2] += self.rng.normal(size=2) * self.p.get("odom_xy", 0.0) * d
+            self.err[2] += self.rng.normal() * self.p.get("odom_yaw", 0.0) * d
+        self.last = pose.copy()
+        c, s = np.cos(self.err[2]), np.sin(self.err[2])  # yaw error rotates the path about the start
+        x, y = pose[0] - self.origin[0], pose[1] - self.origin[1]
+        return np.array([self.origin[0] + c * x - s * y + self.err[0], self.origin[1] + s * x + c * y + self.err[1],
+                         pose[2] + self.err[2]])
+
+    def capture(self, prev, obs, dt: float):
+        """True sensor pose at capture time: `latency_s` before the current observation (linear interpolation)."""
+        if prev is None or dt <= 0:
+            return obs.pos_w, obs.quat_w
+        a = min(self.latency_s / dt, 1.0)
+        q = (1 - a) * obs.quat_w + a * (prev.quat_w if np.dot(prev.quat_w, obs.quat_w) >= 0 else -prev.quat_w)
+        return (1 - a) * obs.pos_w + a * prev.pos_w, q / np.linalg.norm(q)
+
+
 class Policy:
-    def __init__(self, name: str, slow_speed: float = 0.3, dwell: int = 5):
+    def __init__(self, name: str, slow_speed: float = 0.3, dwell: int = 5, reach: float = 0.10,
+                 align: bool = False, budget_steps: int = 80, avoid_holes: bool = False):
+        """approach: `reach` = stand-off tolerance [m]; `align` = turn in place to face the finding before the
+        dwell (a legged robot arrives at the stand-off with any heading; the kinematic mock arrives facing +x);
+        `budget_steps` = give up after this many control steps."""
         assert name in ("walkover", "slow", "approach"), name
         self.name, self.slow_speed, self.dwell = name, slow_speed, dwell
+        self.reach, self.align, self.budget_steps = reach, align, budget_steps
+        self.avoid_holes = avoid_holes  # route around confirmed holes (any strategy): a legged robot can fall in
         self.tried: set[str] = set()
         self.budget = 0
         self.target: str | None = None
@@ -68,7 +109,7 @@ class Policy:
 
 def run_mission(sim, controller, terrain: dict[str, Any], policy: Policy, profile: str = "realistic",
                 seed: int = 0, max_steps: int = 900, nav_cfg: dict[str, Any] | None = None,
-                detect_every: int = 1, log=print) -> dict[str, Any]:
+                detect_every: int = 1, log=print, pose_errors: bool = False, on_step=None) -> dict[str, Any]:
     from ..planning.global_waypoints import GlobalPlanner, WaypointTracker
 
     nc = {"grid_resolution": 0.1, "inflation_margin": 0.15, "waypoint_spacing": 1.0, "waypoint_tolerance": 0.5,
@@ -82,19 +123,47 @@ def run_mission(sim, controller, terrain: dict[str, Any], policy: Policy, profil
     route_x = [w[0] for w in scene.params["route"]]
     mem = SpatialMemory((scene.bounds[0], scene.bounds[1], -half, half), route_x)
     gp = GlobalPlanner(nc["grid_resolution"], sim.robot_radius + nc["inflation_margin"], nc["waypoint_spacing"])
+    hazards: tuple = ()
+
+    def plan_scene():
+        """The mission scene plus confirmed holes as keep-out circles (planner only; the simulator's own scene,
+        which decides collisions, is unchanged)."""
+        if not hazards:
+            return scene
+        import copy
+
+        sc = copy.copy(scene)
+        extra = np.array([[*mem.findings[h]["xy"], max(0.5 * (mem.findings[h].get("extent_m") or 0.3), 0.15) + 0.1]
+                          for h in hazards if h in mem.findings]).reshape(-1, 3)
+        sc.obstacles = np.vstack([np.asarray(scene.obstacles).reshape(-1, 3), extra])
+        sc.scene_id = scene.scene_id + "+holes:" + ",".join(hazards)  # the planner caches its grid per scene id
+        return sc
+
     tracker = WaypointTracker(gp.plan(scene, obs.pos_w[:2], scene.goal), nc["waypoint_tolerance"])
     controller.reset(scene, obs)
-    events, traj, t0 = [], [], time.perf_counter()
+    events, traj, est, t0 = [], [], [], time.perf_counter()
     outcome, t_s = "timeout", 0.0
+    perr = PoseErrors(rig.prof, seed) if pose_errors else None
+    if perr is not None:
+        perr.origin = obs.pose2d[:2].copy()
+    prev_obs, prev_dt = None, sim.control_dt
     for step in range(max_steps):
-        pose = obs.pose2d  # mock: the robot's estimate = truth (odometry error is in the sensor study)
-        traj.append(pose.tolist())
+        true_pose = obs.pose2d
+        pose = perr.estimate(true_pose) if perr is not None else true_pose  # the robot's belief (default: truth)
+        traj.append(true_pose.tolist())
+        est.append(pose.tolist())
+        if on_step is not None:
+            on_step(step, t_s, obs, mem, policy)
         if np.linalg.norm(obs.pos_w[:2] - scene.goal) < nc["goal_tolerance"] and policy.target is None:
             outcome = "goal"
             break
         # --- sense
         R = quat_to_R(obs.quat_w)
-        pts = {s: rig.frame(s, obs.pos_w, R, H) for s in ("depth_d555", "depth_d405")}
+        if perr is not None:  # rays leave the true pose at capture time; the robot uses its current belief
+            cpos, cq = perr.capture(prev_obs, obs, prev_dt)
+            pts = {s: rig.frame(s, cpos, quat_to_R(cq), H) for s in ("depth_d555", "depth_d405")}
+        else:
+            pts = {s: rig.frame(s, obs.pos_w, R, H) for s in ("depth_d555", "depth_d405")}
         for s, q in pts.items():
             ok = np.all(np.isfinite(q), 1)
             if ok.any():
@@ -131,9 +200,20 @@ def run_mission(sim, controller, terrain: dict[str, Any], policy: Policy, profil
                 if 0.6 <= xr <= 2.0 and abs(yr) < 0.8:
                     ext = max([o.get("extent_m") or 0.0 for o in f["observations"]] + [0.0])
                     mem.vote_shape(fid, classify_shape(pts["depth_d555"], pose, f["xy"], ext))
+        # --- route around confirmed holes (replan when the set changes, not while approaching one)
+        if policy.avoid_holes and policy.target is None:
+            hz = tuple(sorted(h for h, f in mem.findings.items() if f["kind"] == "depression" and mem.is_real(h)
+                              and abs(f.get("value_m") or 0.0) > 0.03))
+            if hz != hazards:
+                hazards = hz
+                try:
+                    tracker = WaypointTracker(gp.plan(plan_scene(), obs.pos_w[:2], scene.goal), nc["waypoint_tolerance"])
+                    events.append({"t": t_s, "event": "replan_around_holes", "holes": list(hz)})
+                except Exception as e:  # no path around (e.g. hole spans the walk): keep the old route
+                    events.append({"t": t_s, "event": "replan_failed", "error": str(e)[:80]})
         # --- inspection policy
         wp = tracker.update(obs.pos_w[:2])
-        cap = None
+        cap, turn = None, None  # turn: direct [vx, vy, yaw_rate] override
         if policy.name == "slow":
             for fid, f in mem.findings.items():
                 xr, yr = to_robot(pose, *f["xy"])
@@ -145,7 +225,7 @@ def run_mission(sim, controller, terrain: dict[str, Any], policy: Policy, profil
                     ahead = f["xy"][0] - pose[0]  # along the route (+x), not along the current heading
                     if (fid not in policy.tried and f["kind"] != "dropout" and 0.9 <= ahead <= 3.0
                             and mem.needs_close_look(fid)):
-                        policy.target, policy.dwell_left, policy.budget = fid, policy.dwell, 80
+                        policy.target, policy.dwell_left, policy.budget = fid, policy.dwell, policy.budget_steps
                         policy.tried.add(fid)
                         events.append({"t": t_s, "event": "approach", "finding": fid})
                         break
@@ -159,10 +239,20 @@ def run_mission(sim, controller, terrain: dict[str, Any], policy: Policy, profil
                 if policy.budget <= 0:  # give up after 8 s (unreachable stand-off, e.g. behind an obstacle)
                     events.append({"t": t_s, "event": "approach_aborted", "finding": policy.target})
                     policy.target = None
-                    tracker = WaypointTracker(gp.plan(scene, obs.pos_w[:2], scene.goal), nc["waypoint_tolerance"])
-                elif np.linalg.norm(obs.pos_w[:2] - sxy) > 0.10:
+                    tracker = WaypointTracker(gp.plan(plan_scene(), obs.pos_w[:2], scene.goal), nc["waypoint_tolerance"])
+                elif (dist := float(np.linalg.norm(obs.pos_w[:2] - sxy))) > policy.reach:
                     wp = sxy
                     cap = 0.4
+                    if policy.align and dist < 0.4:
+                        # last metres: direct body-frame command with a floor (the walking policy ignores tiny
+                        # commands, so the MPC's slow-down near the waypoint would stall short of it)
+                        dw = sxy - obs.pos_w[:2]
+                        c, s = np.cos(true_pose[2]), np.sin(true_pose[2])
+                        db = np.array([c * dw[0] + s * dw[1], -s * dw[0] + c * dw[1]])
+                        turn = np.r_[db / dist * float(np.clip(dist, 0.35, 0.4)), 0.0]  # above the dead zone
+                elif policy.align and abs(yerr := float((np.arctan2(f["xy"][1] - true_pose[1], f["xy"][0] - true_pose[0])
+                                                        - true_pose[2] + np.pi) % (2 * np.pi) - np.pi)) > 0.15:
+                    turn = np.array([0.0, 0.0, np.sign(yerr) * float(np.clip(1.5 * abs(yerr), 0.6, 0.9))])  # face it
                 else:
                     policy.dwell_left -= 1
                     cap = 0.0
@@ -170,23 +260,27 @@ def run_mission(sim, controller, terrain: dict[str, Any], policy: Policy, profil
                         events.append({"t": t_s, "event": "inspected", "finding": policy.target,
                                        "status": mem.findings[policy.target]["status"]})
                         policy.target = None
-                        tracker = WaypointTracker(gp.plan(scene, obs.pos_w[:2], scene.goal), nc["waypoint_tolerance"])
+                        tracker = WaypointTracker(gp.plan(plan_scene(), obs.pos_w[:2], scene.goal), nc["waypoint_tolerance"])
         a, _ = controller.act(obs, wp)
-        if cap is not None:
+        if turn is not None:  # direct command from the approach (align mode)
+            a = np.asarray(turn, dtype=a.dtype)
+        elif cap is not None:
             a = a.copy()
             a[0] = min(a[0], cap)
             if cap == 0.0:
                 a[:] = 0.0
         res = sim.step(VelocityCommand.from_action(a, sim.control_dt))
-        t_s += res.info.get("dt_s", sim.control_dt)
-        obs = res.observation
+        prev_dt = res.info.get("dt_s", sim.control_dt)
+        t_s += prev_dt
+        prev_obs, obs = obs, res.observation
         if res.terminated:
             outcome = res.termination_reason or "terminated"
             break
     traj = np.asarray(traj)
     return {"outcome": outcome, "time_s": t_s, "steps": len(traj), "policy": policy.name, "profile": profile,
             "path_m": float(np.linalg.norm(np.diff(traj[:, :2], axis=0), axis=1).sum()) if len(traj) > 1 else 0.0,
-            "trajectory": traj.tolist(), "events": events, "memory": mem.to_dict(), "wall_s": time.perf_counter() - t0}
+            "trajectory": traj.tolist(), "pose_estimate": est if perr is not None else None,
+            "pose_errors": perr is not None, "events": events, "memory": mem.to_dict(), "wall_s": time.perf_counter() - t0}
 
 
 def score_mission(result: dict[str, Any], terrain: dict[str, Any]) -> dict[str, Any]:
