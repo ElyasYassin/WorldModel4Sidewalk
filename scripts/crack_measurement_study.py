@@ -32,6 +32,9 @@ WIDTHS_MM = [1, 2, 3, 5, 8, 13, 20]
 CASES = [("d555_rgb", 0.8), ("d555_rgb", 1.2), ("d555_rgb", 1.6), ("d555_rgb", 2.0), ("d405_rgb", 0.52)]
 BASE_Z = 0.33
 CX = 0.75  # crack centre: middle of a 1.5 m panel
+# Blur (0.8 px), bilinear orthorectification and the dark threshold widen a crack by ~2.2 image pixels at every width
+# (fitted on the 8-trial run, seeds 0-7, cases <= 1.2 m); calibrated width = raw - BIAS_PX * mm/px.
+BIAS_PX = 2.2
 
 
 def random_crack(rng, w):
@@ -74,7 +77,10 @@ def one(cam_name, dist, w, seed):
     out = {"mm_per_px": px * 1000, "true_len_m": true_len}
     if m is None or m["length_m"] < 0.5 * true_len:
         return {**out, "detected": False}
+    wc = max(m["width_m"] - BIAS_PX * px, 0.0)
     return {**out, "detected": True, "width_err_mm": abs(m["width_m"] - w) * 1000, "width_mm": m["width_m"] * 1000,
+            "width_cal_mm": wc * 1000, "width_cal_err_mm": abs(wc - w) * 1000,
+            "ada_cal_ok": (wc > ADA_OPENING_M) == (w > ADA_OPENING_M),
             "len_err_pct": abs(m["length_m"] - true_len) / true_len * 100,
             "ada_ok": (m["width_m"] > ADA_OPENING_M) == (w > ADA_OPENING_M)}
 
@@ -83,13 +89,14 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--trials", type=int, default=8)
     ap.add_argument("--out", default="outputs/crack_study")
+    ap.add_argument("--seed-offset", type=int, default=0, help="e.g. 100: trials disjoint from the calibration run")
     a = ap.parse_args()
     out = resolve_path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     rows, t0 = [], time.time()
     for cam_name, dist in CASES:
         for w_mm in WIDTHS_MM:
-            rs = [one(cam_name, dist, w_mm / 1000, 1000 * k + int(w_mm * 10)) for k in range(a.trials)]
+            rs = [one(cam_name, dist, w_mm / 1000, 1000 * (k + a.seed_offset) + int(w_mm * 10)) for k in range(a.trials)]
             rs = [r for r in rs if r is not None]
             det = [r for r in rs if r["detected"]]
             rows.append({"camera": cam_name, "distance_m": dist, "width_mm": w_mm, "n": len(rs),
@@ -98,7 +105,10 @@ def main() -> int:
                          "width_err_mm": float(np.median([r["width_err_mm"] for r in det])) if det else None,
                          "width_est_mm": float(np.median([r["width_mm"] for r in det])) if det else None,
                          "len_err_pct": float(np.median([r["len_err_pct"] for r in det])) if det else None,
-                         "ada_agree": float(np.mean([r["ada_ok"] for r in det])) if det else None})
+                         "ada_agree": float(np.mean([r["ada_ok"] for r in det])) if det else None,
+                         "width_cal_mm": float(np.median([r["width_cal_mm"] for r in det])) if det else None,
+                         "width_cal_err_mm": float(np.median([r["width_cal_err_mm"] for r in det])) if det else None,
+                         "ada_cal_agree": float(np.mean([r["ada_cal_ok"] for r in det])) if det else None})
         print(f"[{cam_name} {dist} m] done ({time.time() - t0:.0f}s)", flush=True)
     (out / "crack_study.json").write_text(json.dumps(rows, indent=1))
     L = ["# Crack measurement from synthetic images (no lighting / glare / motion blur: optimistic)", "",
@@ -114,6 +124,14 @@ def main() -> int:
                 cells.append("0 % · –")
             else:
                 cells.append(f"{r['detect_rate'] * 100:.0f} % · {r['width_est_mm']:.1f} ({r['width_err_mm']:.1f}) · {r['len_err_pct']:.0f} %")
+        L.append(f"| {w_mm} mm | " + " | ".join(cells) + " |")
+    L += ["", f"Calibrated width (raw - {BIAS_PX} px x mm/px): median estimate [mm] (|error|)", "",
+          "| crack width | " + " | ".join(cases) + " |", "|" + "---|" * (1 + len(CASES))]
+    for w_mm in WIDTHS_MM:
+        cells = []
+        for c, d in CASES:
+            r = next(r for r in rows if r["camera"] == c and r["distance_m"] == d and r["width_mm"] == w_mm)
+            cells.append("–" if not r["detect_rate"] else f"{r['width_cal_mm']:.1f} ({r['width_cal_err_mm']:.1f})")
         L.append(f"| {w_mm} mm | " + " | ".join(cells) + " |")
     (out / "crack_study.md").write_text("\n".join(L) + "\n", encoding="utf-8")
     print("\n".join(L))

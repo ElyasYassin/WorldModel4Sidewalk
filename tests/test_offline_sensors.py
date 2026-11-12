@@ -57,3 +57,12 @@ def test_flying_pixels_only_at_real_discontinuities():
     e_ideal = np.abs(ideal[np.isfinite(ideal)] + 0.33)  # error vs the true floor (the two rigs draw different noise)
     e_mixed = np.abs(mixed[np.isfinite(mixed)] + 0.33)
     assert np.percentile(e_mixed, 90) < np.percentile(e_ideal, 90) + 0.001 and e_mixed.max() < 0.012
+
+
+def test_flying_pixels_do_not_wrap_around_the_image_border():
+    # flat ground: no depth discontinuities, so flying pixels must not create points below the floor (the
+    # wrap-around bug averaged the nearest image row with the farthest one -> 7 cm ghost pits at ~1.5 m)
+    rig = OfflineRig(["depth_d555"], {"mixed_pixels": 1.0, "mixed_thresh": 0.03}, seed=0)
+    e, _ = _grid(rig, "depth_d555")
+    ok = np.isfinite(e)
+    assert np.nanmin(e[ok]) > -0.33 - 0.02

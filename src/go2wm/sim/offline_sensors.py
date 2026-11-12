@@ -139,6 +139,10 @@ class OfflineRig:
                 thr = prof.get("mixed_thresh", 0.03)
                 for ax in (0, 1):
                     prv, nxt = np.roll(img, 1, ax), np.roll(img, -1, ax)
+                    if ax == 0:  # no wrap-around: the image border has no neighbour beyond it
+                        prv[0], nxt[-1] = np.nan, np.nan
+                    else:
+                        prv[:, 0], nxt[:, -1] = np.nan, np.nan
                     db, df = img - prv, nxt - img
                     edge = np.abs(df - db) > thr + 0.3 * np.minimum(np.abs(db), np.abs(df))
                     nb = np.where(np.abs(df) > np.abs(db), nxt, prv)  # the neighbour across the jump

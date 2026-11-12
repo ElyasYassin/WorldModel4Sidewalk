@@ -29,6 +29,7 @@ class SpatialMemory:
         self.nx, self.ny = int(np.ceil((x1 - x0) / cell)), int(np.ceil((y1 - y0) / cell))
         self.seen: dict[str, np.ndarray] = {}
         self.findings: dict[str, dict[str, Any]] = {}
+        self.aliases: dict[str, str] = {}
         self._next = 0
 
     # --- findings
@@ -39,7 +40,7 @@ class SpatialMemory:
                 continue
             dx, dy = np.abs(np.asarray(f["xy"]) - ob.xy)
             if ob.kind == "edge":  # transverse edges are lines across the walk: same x, anywhere along y
-                ok, d = dx < 0.2 and dy < 1.2, dx
+                ok, d = dx < 0.2, dx  # (an upheaval fault can be seen in pieces far apart across a wide walk)
             else:
                 d = float(np.hypot(dx, dy))
                 ext = max([o.get("extent_m") or 0.0 for o in f["observations"]] + [0.0])
@@ -55,7 +56,51 @@ class SpatialMemory:
         rec = {k: (v.tolist() if isinstance(v, np.ndarray) else v) for k, v in asdict(ob).items()}
         f["observations"].append(rec)
         self._update(f)
-        return best
+        return self._consolidate(best)
+
+    def _radius(self, f: dict[str, Any]) -> float:
+        ext = max([o.get("extent_m") or 0.0 for o in f["observations"]] + [0.0])
+        return max(self.assoc + 0.05, 0.75 * ext)
+
+    def _consolidate(self, fid: str) -> str:
+        """Merge findings of the same kind that turn out to overlap (one defect first seen in pieces). The older
+        id survives; `aliases` maps merged ids to it."""
+        f = self.findings[fid]
+        if f["kind"] == "depression":  # pieces of one fault across the walk: same x, far apart in y -> an edge
+            for oid, o in list(self.findings.items()):
+                if (oid != fid and o["kind"] == "depression" and abs(o["xy"][0] - f["xy"][0]) < 0.2
+                        and abs(o["xy"][1] - f["xy"][1]) >= 0.6 and min(o.get("n_detections", 0), f.get("n_detections", 0)) >= 2):
+                    keep, drop = sorted((fid, oid), key=lambda k: self.findings[k]["first_seen_t"])
+                    k = self.findings[keep]
+                    k["observations"] += self.findings[drop]["observations"]
+                    k["observations"].sort(key=lambda r: r["t"])
+                    for ob in k["observations"]:  # the depression values were not step measurements
+                        if ob["value_m"] is not None:
+                            ob["value_m"], ob["provenance"] = None, "detected"
+                    k["kind"], k["relabelled"] = "edge", "depressions aligned across the walk"
+                    del self.findings[drop]
+                    self.aliases[drop] = keep
+                    self._update(k)
+                    return self._consolidate(keep)
+        for oid, o in list(self.findings.items()):
+            if oid == fid or o["kind"] != f["kind"]:
+                continue
+            dx, dy = np.abs(np.asarray(o["xy"]) - np.asarray(f["xy"]))
+            near = dx < 0.2 if f["kind"] == "edge" else np.hypot(dx, dy) < max(self._radius(f), self._radius(o))
+            if near:
+                keep, drop = sorted((fid, oid), key=lambda k: self.findings[k]["first_seen_t"])
+                self.findings[keep]["observations"] += self.findings[drop]["observations"]
+                self.findings[keep]["observations"].sort(key=lambda r: r["t"])
+                del self.findings[drop]
+                self.aliases[drop] = keep
+                self._update(self.findings[keep])
+                return self._consolidate(keep)
+        return fid
+
+    def resolve(self, fid: str | None) -> str | None:
+        while fid is not None and fid not in self.findings and fid in self.aliases:
+            fid = self.aliases[fid]
+        return fid
 
     def _update(self, f: dict[str, Any]) -> None:
         obs = f["observations"]
@@ -82,9 +127,35 @@ class SpatialMemory:
         f["status"] = "measured" if best_conf >= 0.8 and f["value_spread_m"] < 0.005 else "uncertain"
 
     def is_real(self, fid: str) -> bool:
-        """A finding counts once it was detected in at least two frames or measured (single detections are
-        usually noise)."""
-        return self.findings[fid].get("n_detections", 0) >= 2
+        """A finding counts once it was detected in at least two frames (single detections are usually noise) and
+        is not a side effect of a step edge."""
+        return self.findings[fid].get("n_detections", 0) >= 2 and self.explained_by(fid) is None
+
+    def explained_by(self, fid: str, near: float = 0.35, low_side: float = 0.65) -> str | None:
+        """A depression or dropout right at a confirmed transverse edge is the edge's own footprint: the low side
+        of the step and the ground it occludes (no returns). It may lie up to `low_side` beyond the edge on its low
+        side (known from the measured step sign once measured), `near` otherwise. Returns that edge's id, or None."""
+        f = self.findings[fid]
+        if f["kind"] == "edge":
+            return None
+        if f["kind"] == "dropout":  # the ground a deep hole's near wall hides from the camera
+            for did, d in self.findings.items():
+                if (d["kind"] == "depression" and d.get("n_detections", 0) >= 2
+                        and np.hypot(*(np.asarray(d["xy"]) - f["xy"])) < self._radius(d) + 0.2):
+                    return did
+        for eid, e in self.findings.items():
+            if e["kind"] != "edge" or e.get("n_detections", 0) < 2:
+                continue
+            dx = f["xy"][0] - e["xy"][0]  # + = beyond the edge along the route
+            v = e.get("value_m")
+            lo, hi = -near, near
+            if v is None or v < 0:  # step down along +x: the low side is beyond the edge
+                hi = low_side
+            if v is None or v > 0:
+                lo = -low_side
+            if lo < dx < hi:
+                return eid
+        return None
 
     def needs_close_look(self, fid: str) -> bool:
         f = self.findings[fid]
@@ -113,7 +184,9 @@ class SpatialMemory:
 
     def to_dict(self) -> dict[str, Any]:
         real = {k: v for k, v in self.findings.items() if self.is_real(k)}
-        return {"findings": real, "n_single_detections_dropped": len(self.findings) - len(real),
+        merged = {k: self.explained_by(k) for k in self.findings if self.explained_by(k)}
+        return {"findings": real, "merged_into": merged,
+                "n_single_detections_dropped": len(self.findings) - len(real) - len(merged),
                 "coverage": self.coverage(), "frame": "tile scene frame (robot's estimate)"}
 
     def save(self, path: str | Path) -> Path:

@@ -67,7 +67,7 @@ class Policy:
 
 def run_mission(sim, controller, terrain: dict[str, Any], policy: Policy, profile: str = "realistic",
                 seed: int = 0, max_steps: int = 900, nav_cfg: dict[str, Any] | None = None,
-                detect_every: int = 2, log=print) -> dict[str, Any]:
+                detect_every: int = 1, log=print) -> dict[str, Any]:
     from ..planning.global_waypoints import GlobalPlanner, WaypointTracker
 
     nc = {"grid_resolution": 0.1, "inflation_margin": 0.15, "waypoint_spacing": 1.0, "waypoint_tolerance": 0.5,
@@ -136,6 +136,9 @@ def run_mission(sim, controller, terrain: dict[str, Any], policy: Policy, profil
                         policy.tried.add(fid)
                         events.append({"t": t_s, "event": "approach", "finding": fid})
                         break
+            policy.target = mem.resolve(policy.target)  # the target may have been merged into an older finding
+            if policy.target is not None and policy.target not in mem.findings:
+                policy.target = None
             if policy.target is not None:
                 f = mem.findings[policy.target]
                 sxy = np.array([f["xy"][0] - D405_STANDOFF, np.clip(f["xy"][1], -half + 0.35, half - 0.35)])

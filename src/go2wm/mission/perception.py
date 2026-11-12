@@ -82,7 +82,7 @@ def to_robot(pose, X, Y):
 
 def detect_candidates(elev: np.ndarray, count: np.ndarray, pose: np.ndarray, t: float, walk_half: float,
                       thresh: float = 0.012, thresh_per_m: float = 0.008, max_range: float = 2.5, min_cells: int = 3,
-                      sensor: str = "depth_d555") -> list[Observation]:
+                      sensor: str = "depth_d555", edge_min_span: float = 0.6) -> list[Observation]:
     """Clusters of cells deviating from the local median. The threshold grows with range beyond 1 m (noise grows
     with depth). A step produces a raised cluster on its high side and a depressed one on its low side, and a hole
     a raised far rim: touching clusters of opposite sign are merged into the dominant one (peak x cells)."""
@@ -94,7 +94,10 @@ def detect_candidates(elev: np.ndarray, count: np.ndarray, pose: np.ndarray, t: 
     comps = []
     for sign, kind in ((-1, "depression"), (1, "edge")):
         for comp in _clusters(ok & (sign * res > thr)):
-            if len(comp) >= min_cells:
+            peak = float(np.max(sign * res[comp[:, 0], comp[:, 1]]))
+            thr_c = float(np.max(thr[comp[:, 0], comp[:, 1]]))
+            # far away a small hole is only a couple of cells: accept 2 cells if the deviation is strong
+            if len(comp) >= min_cells or (len(comp) >= 2 and peak > 2.0 * thr_c):
                 i, j = comp[:, 0], comp[:, 1]
                 comps.append({"kind": kind, "idx": comp, "score": float(np.max(sign * res[i, j])) * len(comp),
                               "peak": float(np.max(sign * res[i, j]))})
@@ -109,10 +112,33 @@ def detect_candidates(elev: np.ndarray, count: np.ndarray, pose: np.ndarray, t: 
                 keep[lo] = False
                 hi = b if lo == a else a
                 comps[hi]["idx"] = np.vstack([comps[hi]["idx"], comps[lo]["idx"]])
+    comps = [c for c, k in zip(comps, keep) if k]
+    # A transverse edge (upheaval fault, step) is seen as several pieces at the same distance spread across the
+    # walk: group clusters whose centres are within 15 cm along x; a group spanning >= edge_min_span across (and
+    # much wider than deep) is one edge. Anything compact is a depression (a raised compact cluster is the far
+    # wall of a hole seen obliquely).
+    for c in comps:
+        c["xc"] = float(CX[c["idx"][:, 0]].mean())
+    comps.sort(key=lambda c: c["xc"])
+    groups, cur = [], []
+    for c in comps:
+        if cur and c["xc"] - np.mean([g["xc"] for g in cur]) > 0.15:
+            groups.append(cur)
+            cur = []
+        cur.append(c)
+    if cur:
+        groups.append(cur)
+    merged = []
+    for g in groups:
+        idx = np.vstack([c["idx"] for c in g])
+        x_span, y_span = np.ptp(CX[idx[:, 0]]) + ELEV_GRID["res"], np.ptp(CY[idx[:, 1]]) + ELEV_GRID["res"]
+        if y_span >= edge_min_span and y_span >= 2.0 * x_span:
+            merged.append({"kind": "edge", "idx": idx, "peak": max(c["peak"] for c in g)})
+        else:
+            for c in g:
+                merged.append({**c, "kind": "depression"} if c["kind"] == "edge" else c)
     out = []
-    for c, k in zip(comps, keep):
-        if not k:
-            continue
+    for c in merged:
         i, j = c["idx"][:, 0], c["idx"][:, 1]
         xr, yr = CX[i].mean(), CY[j].mean()
         wx, wy = to_world(pose, xr, yr)
