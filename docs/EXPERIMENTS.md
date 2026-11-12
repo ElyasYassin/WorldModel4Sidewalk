@@ -982,3 +982,32 @@ from the 8-trial run the 2.2 px bias was fitted on. Median calibrated width [mm]
 - **The 13 mm ADA opening limit** is decided correctly from ≤ 1.2 m.
 - **Caveats:** synthetic, uniformly lit images. Real glare, shadows, wet concrete and motion blur will widen these
   errors. The 2.2 px figure must be re-fitted on the real camera.
+
+## Phase 1, step 5b: final evaluation v2 on fresh tiles (2026-11-12, frozen at commit 408f987)
+
+Perception v2 adds two rules:
+- **Multi-view confirmation:** a finding needs detections from viewpoints ≥ 15 cm apart.
+- **Hole walls:** a short edge inside a hole is that hole's wall, but only if the hole has at least as many detections
+  and no step-shaped votes.
+
+These were developed on the two dev sets only, then evaluated on 24 fresh tiles (`outputs/defect_tiles_final2`,
+seed 300), realistic profile (`outputs/missions_final2`):
+
+| strategy | time [s] | recall | precision | false / mission | upheaval found / D405 / err [mm] | hole found / D405 / depth err [mm] | puddle found |
+|---|---|---|---|---|---|---|---|
+| walkover | 33.5 | 86 % | 91 % | 0.29 | 14/21 / 5 / 2.1 | 30/34 / 5 / 1.2 | 28/29 |
+| slow | 37.8 | 83 % | 92 % | 0.25 | 14/21 / 4 / 1.7 | 29/34 / 4 / 1.5 | 27/29 |
+| approach | 38.9 | 83 % | 91 % | 0.29 | 15/21 / 11 / 1.1 | 28/34 / 26 / 0.9 | 27/29 |
+
+- **Approach now matches walkover's detection quality** (precision 91 % for both, recall 83 vs 86 %). It adds
+  close-range D405 evidence on 26/34 holes (walkover 5) and 11/21 upheavals (5), for +5.4 s per route.
+  The approach gap seen in v1 (precision 86 %, 0.38 false findings per mission) is gone.
+- **Most "false" findings are type confusions at a real defect:** 5 of 7 walkover and 4 of 7 approach false findings
+  are a small upheaval reported as a pit, or a hole reported as an edge. True phantoms are 2 (walkover) and 3 (approach)
+  over 24 missions, i.e. ~0.1 per mission. Location-level precision is ~97 %.
+- **Weakest point: upheavals.** Recall is 67–71 %; the misses are mostly small (≤ 2.3 cm) half-width faults. The
+  upheaval step error (1–2 mm) and ADA class (100 % correct when found) are fine.
+- **Puddles** are found from dropout (28/29) but not measured.
+
+Pessimistic sensor errors (`outputs/missions_final2_pess`) and v2 on the seed-200 set (`outputs/missions_final_v2code`,
+informative only) follow.
