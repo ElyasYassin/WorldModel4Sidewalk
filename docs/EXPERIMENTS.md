@@ -1027,3 +1027,15 @@ Doubled noise, 10 % dropout, 1° calibration error and 2.5× odometry drift cost
 
 This is the clearest case for active inspection. Under the realistic profile its benefit is mostly *more defects with
 close-range evidence*; under worse sensors it is also *the only strategy that keeps millimetre measurements*.
+
+### v2 on the seed-200 set (informative: seed 200 motivated the v2 rules; `outputs/missions_final_v2code`)
+
+| strategy | recall | precision | false / mission | D405 upheavals / holes |
+|---|---|---|---|---|
+| walkover | 85 % (v1 86 %) | 98 % (v1 100 %) | 0.04 | 9 / 1 |
+| slow | 83 % | 95 % | 0.12 | 10 / 1 |
+| approach | 82 % (v1 80 %) | 97 % (v1 86 %) | 0.08 (v1 0.38) | 19 / 15 |
+
+The v2 rules remove most of approach's false findings without hurting walkover. Approach's hole recall on this set
+stays at 18/26, against 22 for walkover. The lower walkover precision on seed 300 (91 %) is tile-set variance, not a v2
+regression.
