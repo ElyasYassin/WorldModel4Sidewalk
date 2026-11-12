@@ -906,3 +906,25 @@ built only from the robot's memory. It contains:
 - a synthetic camera evidence crop rendered at the recorded pose of the best observation;
 - a route map with the findings;
 - a separate ground-truth appendix for evaluation.
+
+### Sensor studies rerun after the flying-pixel fix (2026-11-12)
+
+`outputs/sensor_errors_v2`, `outputs/sensor_errors_ablation_v2`, `outputs/near_far_steps_v2`. The wrap-around bug barely
+changed these map-level numbers (realistic D555 single-frame p90 at 0.3–0.8 m: 1.45 → 1.35 cm), so the conclusions hold.
+
+Ablation (realistic, D555, p90 at 0.3–0.8 m / step p90):
+
+| errors switched off | absolute height p90 | step p90 |
+|---|---|---|
+| none | 1.0 cm | 54 mm |
+| calibration | 0.44 cm | 52 mm |
+| stereo (flying pixels, fixed pattern) | 1.0 cm | 2.9 mm |
+| odometry | 1.0 cm | 54 mm |
+
+- **Calibration** dominates absolute height error.
+- **Flying pixels at step edges** dominate the D555 step error.
+- **Odometry drift** is negligible over 1 s.
+
+Near/far step study, realistic profile:
+- **D405 at its 0.53 m stand-off:** 0.1–0.4 mm p90 with 100 % ADA class agreement for every step size, in all profiles.
+- **D555:** ≤ 1.1 mm p90 within 1.2 m for steps up to 11 mm; degrades sharply beyond 1.6 m.
