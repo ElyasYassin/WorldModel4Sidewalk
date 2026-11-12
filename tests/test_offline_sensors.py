@@ -66,3 +66,16 @@ def test_flying_pixels_do_not_wrap_around_the_image_border():
     e, _ = _grid(rig, "depth_d555")
     ok = np.isfinite(e)
     assert np.nanmin(e[ok]) > -0.33 - 0.02
+
+
+def test_puddle_loses_most_depth_returns():
+    puddle = {"type": "puddle", "x": 1.2, "y": 0.0, "rx": 0.4, "ry": 0.4, "angle": 0.0, "depth": 0.0}
+    R = np.eye(3)
+    cx, cy = grid_centres()
+    inside = (np.hypot(cx[:, None] - 1.2, cy[None, :]) < 0.3)
+    counts = []
+    for defects in ([], [puddle]):
+        rig = OfflineRig(["depth_d555"], "ideal", seed=0, defects=defects)
+        _, c = bin_base_points(rig.frame("depth_d555", np.array([0.0, 0.0, 0.33]), R, FLAT), R)
+        counts.append(c[inside].sum())
+    assert counts[0] > 50 and counts[1] < 0.3 * counts[0]

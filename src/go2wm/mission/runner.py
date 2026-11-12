@@ -77,7 +77,7 @@ def run_mission(sim, controller, terrain: dict[str, Any], policy: Policy, profil
     obs = sim.reset(seed)
     scene = sim.scene
     H = lambda x, y: sidewalk_height(x, y, p)  # noqa: E731
-    rig = OfflineRig(["depth_d555", "depth_d405"], profile, seed=seed)
+    rig = OfflineRig(["depth_d555", "depth_d405"], profile, seed=seed, defects=p.get("defects"))
     route_x = [w[0] for w in scene.params["route"]]
     mem = SpatialMemory((scene.bounds[0], scene.bounds[1], -half, half), route_x)
     gp = GlobalPlanner(nc["grid_resolution"], sim.robot_radius + nc["inflation_margin"], nc["waypoint_spacing"])
@@ -110,6 +110,8 @@ def run_mission(sim, controller, terrain: dict[str, Any], policy: Policy, profil
             for ob in detect_dropouts(c, expected_hits("depth_d555", R, ground), pose, t_s, half):
                 mem.add(ob)
         for fid, f in list(mem.findings.items()):
+            if fid not in mem.findings:  # merged into another finding by a measurement earlier in this loop
+                continue
             if not mem.is_real(fid) or f["kind"] == "dropout":  # dropouts need a camera, not a depth measurement
                 continue
             for s in ("depth_d405", "depth_d555"):
@@ -217,13 +219,20 @@ def score_mission(result: dict[str, Any], terrain: dict[str, Any]) -> dict[str, 
             r.update(finding=best, kind_found=f["kind"], status=f["status"], best_sensor=f.get("best_sensor"),
                      value_m=f.get("value_m"))
             if f.get("value_m") is not None:
-                if t["type"] == "upheaval":
-                    r["abs_err_m"] = abs(f["value_m"] - t["true_value"])
+                if t["type"] == "upheaval":  # magnitude: the sign depends on the side it was measured from
+                    r["abs_err_m"] = abs(abs(f["value_m"]) - abs(t["true_value"]))
                     r["ada_ok"] = ada_level_class(f["value_m"]) == ada_level_class(t["true_value"])
                 else:
                     r["abs_err_m"] = abs(f["value_m"] - t["true_value"])
         rows.append(r)
-    fp = [fid for fid in findings if fid not in used]
+    # depressions on a crack wide/deep enough for the depth sensors are real (not scored as a required defect)
+    from ..sim.defects import dist_to_polyline
+
+    cracks = [d for d in p["defects"] if d["type"] == "crack"]
+    on_crack = [fid for fid in findings if fid not in used and findings[fid]["kind"] == "depression"
+                and any(float(dist_to_polyline(np.array(findings[fid]["xy"][0]), np.array(findings[fid]["xy"][1]),
+                                               c["points"])) < 0.2 for c in cracks)]
+    fp = [fid for fid in findings if fid not in used and fid not in on_crack]
     by = {}
     for typ in ("upheaval", "hole", "puddle"):
         rr = [r for r in rows if r["type"] == typ]
@@ -232,5 +241,6 @@ def score_mission(result: dict[str, Any], terrain: dict[str, Any]) -> dict[str, 
             by[typ] = {"n": len(rr), "found": sum(r["found"] for r in rr),
                        "measured_d405": sum(r.get("best_sensor") == "depth_d405" for r in rr),
                        "median_abs_err_mm": float(np.median(errs) * 1000) if errs else None}
-    return {"per_defect": rows, "by_type": by, "false_findings": len(fp), "n_findings": len(findings),
+    return {"per_defect": rows, "by_type": by, "false_findings": len(fp), "false_ids": fp, "crack_findings": len(on_crack),
+            "n_findings": len(findings),
             "hazards_in_graph": len(g["hazards"])}

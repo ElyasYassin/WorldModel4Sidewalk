@@ -43,8 +43,7 @@ class SpatialMemory:
                 ok, d = dx < 0.2, dx  # (an upheaval fault can be seen in pieces far apart across a wide walk)
             else:
                 d = float(np.hypot(dx, dy))
-                ext = max([o.get("extent_m") or 0.0 for o in f["observations"]] + [0.0])
-                ok = d < max(self.assoc + 0.05, 0.75 * ext)
+                ok = d < self._radius(f)
             if ok and d < bd:
                 best, bd = fid, d
         if best is None:
@@ -60,6 +59,8 @@ class SpatialMemory:
 
     def _radius(self, f: dict[str, Any]) -> float:
         ext = max([o.get("extent_m") or 0.0 for o in f["observations"]] + [0.0])
+        if f["kind"] == "dropout":  # a puddle (up to ~1.7 m long) is seen in partial patches
+            return max(0.9, ext)
         return max(self.assoc + 0.05, 0.75 * ext)
 
     def _consolidate(self, fid: str) -> str:
@@ -131,10 +132,10 @@ class SpatialMemory:
         is not a side effect of a step edge."""
         return self.findings[fid].get("n_detections", 0) >= 2 and self.explained_by(fid) is None
 
-    def explained_by(self, fid: str, near: float = 0.35, low_side: float = 0.65) -> str | None:
+    def explained_by(self, fid: str, near: float = 0.5, low_side: float = 0.65) -> str | None:
         """A depression or dropout right at a confirmed transverse edge is the edge's own footprint: the low side
         of the step and the ground it occludes (no returns). It may lie up to `low_side` beyond the edge on its low
-        side (known from the measured step sign once measured), `near` otherwise. Returns that edge's id, or None."""
+        side (from the measured step sign), `near` on the other. Returns that edge's id, or None."""
         f = self.findings[fid]
         if f["kind"] == "edge":
             return None

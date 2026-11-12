@@ -97,7 +97,9 @@ def odometry_estimate(pose: np.ndarray, z: np.ndarray, prof: dict[str, float], r
 class OfflineRig:
     """One session (one robot, one calibration) of the D555 / L1 sensors under an error profile."""
 
-    def __init__(self, sensors: list[str], profile: str | dict = "ideal", seed: int = 0):
+    def __init__(self, sensors: list[str], profile: str | dict = "ideal", seed: int = 0,
+                 defects: list[dict] | None = None):
+        self.defects = defects or []  # standing water (puddles) loses returns, as in the Isaac rig
         self.prof = PROFILES[profile] if isinstance(profile, str) else dict(profile)
         self.rng = np.random.default_rng(seed)
         self.sensors = sensors
@@ -126,6 +128,11 @@ class OfflineRig:
                  r_max=min(spec["range_m"][1], 8.0))
         ok = np.isfinite(r) & (r >= spec["range_m"][0]) & (r <= spec["range_m"][1])
         ok &= rng.uniform(size=len(r)) >= prof.get("dropout", spec.get("dropout", 0.0))
+        if self.defects:
+            from .defects import range_dropout
+
+            hit = starts_w + (d_true @ base_R.T) * np.where(np.isfinite(r), r, 0.0)[:, None]
+            ok &= rng.uniform(size=len(r)) >= range_dropout(hit[:, 0], hit[:, 1], self.defects, spec["kind"])
         r = np.where(np.isfinite(r), r, 0.0)
         nz, mult = spec["noise"], prof.get("noise_mult", 1.0)
         if nz["model"] == "depth_quadratic":
