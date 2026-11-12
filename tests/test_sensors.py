@@ -1,12 +1,12 @@
 import numpy as np
 
-from go2wm.data.episodes import RANGE_SENSORS
+from go2wm.data.episodes import RANGE_SENSORS, RECORDABLE_SENSORS
 from go2wm.sim.sensors import (GRID_SHAPE, SENSOR_SPECS, base_frame_rays, bin_elevation, corrupt_hits, grid_centres,
                                n_rays, pinhole_directions, pitch_matrix, sample_directions)
 
 
 def test_specs_match_episode_arrays():
-    assert set(SENSOR_SPECS) == set(RANGE_SENSORS)
+    assert set(SENSOR_SPECS) == set(RECORDABLE_SENSORS) and set(RANGE_SENSORS) <= set(SENSOR_SPECS)
 
 
 def test_pitch_and_pinhole_geometry():
