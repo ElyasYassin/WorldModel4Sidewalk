@@ -27,6 +27,24 @@ from go2wm.planning.local_mpc import ModelPredictor, MPCController  # noqa: E402
 from go2wm.planning.safety import SafetyFilter  # noqa: E402
 
 
+def one_mission(job):
+    """Run (and save) one mission; returns its result. Top-level so worker processes can run it."""
+    pol, ti, tile, a = job
+    pc = load_config(a["planner"])
+    sim = MockMissionSim(load_config("configs/mock.yaml"), tile)
+    safety = SafetyFilter({**pc["safety"], "limits": pc["limits"], "robot_radius": pc["robot_radius"]})
+    ctrl = MPCController(ModelPredictor(KinematicBaseline(1, "command")), pc, safety, a["seed"], "kinematic_mpc")
+    res = run_mission(sim, ctrl, tile, Policy(pol), a["profile"], seed=a["seed"] + ti, log=lambda *x: None)
+    res["score"] = score_mission(res, tile)
+    res["tile"] = ti
+    (Path(a["out"]) / f"{pol}_tile{ti}.json").write_text(json.dumps(res, default=float))
+    sc = res["score"]
+    print(f"[{pol}] tile {ti}: {res['outcome']} in {res['time_s']:.1f} s, findings {sc['n_findings']} "
+          f"(false {sc['false_findings']}), " + ", ".join(f"{k} {v['found']}/{v['n']} found, {v['measured_d405']} by D405"
+                                                           for k, v in sc["by_type"].items()), flush=True)
+    return res
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--tiles", default="outputs/defect_tiles/tiles.json")
@@ -37,30 +55,33 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="outputs/missions")
     ap.add_argument("--overwrite", action="store_true", help="rerun missions that already have a result file")
+    ap.add_argument("--workers", type=int, default=1, help="missions run in parallel processes")
     a = ap.parse_args()
     tiles = json.loads(resolve_path(a.tiles).read_text())
-    pc = load_config(a.planner)
     out = resolve_path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    summary = []
+    cfg = {"planner": a.planner, "seed": a.seed, "profile": a.profile, "out": str(out)}
+    done, jobs = {}, []
     for pol in a.policies:
         for ti in a.use:
-            done = out / f"{pol}_tile{ti}.json"
-            if done.exists() and not a.overwrite:  # resume: keep finished missions
-                summary.append(json.loads(done.read_text()))
-                continue
-            sim = MockMissionSim(load_config("configs/mock.yaml"), tiles[ti])
-            safety = SafetyFilter({**pc["safety"], "limits": pc["limits"], "robot_radius": pc["robot_radius"]})
-            ctrl = MPCController(ModelPredictor(KinematicBaseline(1, "command")), pc, safety, a.seed, "kinematic_mpc")
-            res = run_mission(sim, ctrl, tiles[ti], Policy(pol), a.profile, seed=a.seed + ti)
-            res["score"] = score_mission(res, tiles[ti])
-            res["tile"] = ti
-            (out / f"{pol}_tile{ti}.json").write_text(json.dumps(res, default=float))
-            sc = res["score"]
-            print(f"[{pol}] tile {ti}: {res['outcome']} in {res['time_s']:.1f} s, findings {sc['n_findings']} "
-                  f"(false {sc['false_findings']}), " + ", ".join(f"{k} {v['found']}/{v['n']} found, {v['measured_d405']} by D405"
-                                                                   for k, v in sc["by_type"].items()), flush=True)
-            summary.append(res)
+            f = out / f"{pol}_tile{ti}.json"
+            if f.exists() and not a.overwrite:  # resume: keep finished missions
+                done[(pol, ti)] = json.loads(f.read_text())
+            else:
+                jobs.append((pol, ti, tiles[ti], cfg))
+    if a.workers > 1 and len(jobs) > 1:
+        import os
+        from concurrent.futures import ProcessPoolExecutor
+
+        os.environ.setdefault("OMP_NUM_THREADS", "1")  # one core per mission
+        os.environ.setdefault("MKL_NUM_THREADS", "1")
+        with ProcessPoolExecutor(min(a.workers, len(jobs))) as ex:
+            for job, res in zip(jobs, ex.map(one_mission, jobs)):
+                done[(job[0], job[1])] = res
+    else:
+        for job in jobs:
+            done[(job[0], job[1])] = one_mission(job)
+    summary = [done[(pol, ti)] for pol in a.policies for ti in a.use]
     write_table(summary, out / "comparison.md", a.profile)
     print((out / "comparison.md").read_text(encoding="utf-8"))
     return 0
