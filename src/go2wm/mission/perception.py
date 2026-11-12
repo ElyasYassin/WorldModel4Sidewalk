@@ -205,6 +205,37 @@ def _plane(q: np.ndarray):
     return coef
 
 
+def classify_shape(points_b: np.ndarray, pose: np.ndarray, target_xy, extent: float | None = None,
+                   half_window: float = 0.2, min_dev: float = 0.006) -> str | None:
+    """Step or pit? From one D555 frame, along the walk (world x) in a lateral strip through the finding: fit ONE
+    ground plane (with its grade) to the ground before (0.15-0.6 m) and beyond (past the finding's extent, 0.6 m)
+    plus a step offset for the far side. A step has a clear offset (upheaval fault); a pit has none but is low at
+    the centre (hole, dip, puddle). None if the frame does not cover both sides or nothing stands out."""
+    p = points_b[np.all(np.isfinite(points_b), axis=1)]
+    if len(p) < 30:
+        return None
+    wx_, wy_ = to_world(pose, p[:, 0], p[:, 1])
+    tx, ty = float(target_xy[0]), float(target_xy[1])
+    W = np.c_[wx_ - tx, wy_ - ty, p[:, 2]]
+    W = W[np.abs(W[:, 1]) < half_window]
+    r = float(np.clip(0.5 * (extent or 0.0) + 0.05, 0.35, 0.6))  # clear of the largest holes (r ~0.32)
+    near = W[(W[:, 0] > -r - 0.45) & (W[:, 0] < -r)]
+    far = W[(W[:, 0] > r) & (W[:, 0] < r + 0.6)]
+    mid = W[np.abs(W[:, 0]) < 0.1]
+    if len(near) < 15 or len(far) < 15 or len(mid) < 5:
+        return None
+    q = np.vstack([near, far])
+    side = np.r_[np.zeros(len(near)), np.ones(len(far))]
+    A = np.c_[np.ones(len(q)), q[:, 0], q[:, 1], side]
+    (a, bx, by, step), *_ = np.linalg.lstsq(A, q[:, 2], rcond=None)
+    rc = float(np.percentile(mid[:, 2] - (a + bx * mid[:, 0] + by * mid[:, 1]), 10))
+    if abs(step) >= min_dev and abs(step) >= 0.6 * abs(min(rc, 0.0)):
+        return "step"
+    if rc <= -min_dev and abs(step) < 0.5 * abs(rc):
+        return "pit"
+    return None
+
+
 def measure(points_b: np.ndarray, pose: np.ndarray, target_xy: np.ndarray, kind: str, sensor: str, t: float,
             radius: float = 0.35) -> Observation | None:
     """Measure a candidate from one frame's raw base-frame points (heights relative to the base)."""

@@ -27,7 +27,8 @@ from ..sim.mock import FAMILY_PARAMS, MockGo2Sim, _stable_seed
 from ..sim.offline_sensors import OfflineRig, quat_to_R
 from ..sim.terrain import params_with_defaults, sidewalk_height
 from .memory import SpatialMemory
-from .perception import detect_candidates, detect_dropouts, expected_hits, in_view, measure, to_robot, to_world
+from .perception import (classify_shape, detect_candidates, detect_dropouts, expected_hits, in_view, measure,
+                         to_robot, to_world)
 from .scene import sidewalk_mission_scene
 
 D405_STANDOFF = 0.52  # m ahead of the base: centre of the D405 measuring zone
@@ -120,6 +121,16 @@ def run_mission(sim, controller, terrain: dict[str, Any], policy: Policy, profil
                     if m is not None:
                         mem.add(m)
                     break
+        # --- shape check (step vs pit) from the D555 while a finding is 0.6-2.0 m ahead
+        if step % detect_every == 0:
+            for fid in list(mem.findings):
+                f = mem.findings.get(fid)
+                if f is None or f["kind"] not in ("edge", "depression") or not mem.is_real(fid):
+                    continue
+                xr, yr = to_robot(pose, *f["xy"])
+                if 0.6 <= xr <= 2.0 and abs(yr) < 0.8:
+                    ext = max([o.get("extent_m") or 0.0 for o in f["observations"]] + [0.0])
+                    mem.vote_shape(fid, classify_shape(pts["depth_d555"], pose, f["xy"], ext))
         # --- inspection policy
         wp = tracker.update(obs.pos_w[:2])
         cap = None

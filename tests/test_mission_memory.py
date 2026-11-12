@@ -48,3 +48,28 @@ def test_edge_footprint_and_hole_shadow_are_merged():
     real = m.to_dict()["findings"]
     kinds = sorted(f["kind"] for f in real.values())
     assert kinds == ["depression", "edge"], kinds
+
+
+def test_classify_shape_step_vs_pit_vs_flat():
+    from go2wm.mission.perception import classify_shape
+    from go2wm.sim.offline_sensors import OfflineRig
+
+    terrains = {
+        "step": lambda x, y: np.where(np.asarray(x) > 2.0, 0.02, 0.0),
+        "pit": lambda x, y: np.where(np.hypot(np.asarray(x) - 2.0, np.asarray(y)) < 0.2, -0.05, 0.0),
+        "flat": lambda x, y: np.zeros(np.shape(x)),
+    }
+    for want, H in terrains.items():
+        rig = OfflineRig(["depth_d555"], "ideal", seed=0)
+        q = rig.frame("depth_d555", np.array([1.0, 0.0, 0.33]), np.eye(3), H)
+        got = classify_shape(q, np.array([1.0, 0.0, 0.0]), (2.0, 0.0), extent=0.4)
+        assert got == (None if want == "flat" else want), (want, got)
+
+
+def test_shape_votes_relabel_a_depression_as_edge():
+    m = _mem()
+    a = m.add(_det(0.0, "depression", 2.0, 0.3))
+    m.add(_det(0.1, "depression", 2.0, 0.32))
+    for _ in range(3):
+        a = m.vote_shape(a, "step")
+    assert m.findings[a]["kind"] == "edge"

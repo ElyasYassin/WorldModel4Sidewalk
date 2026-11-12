@@ -98,6 +98,27 @@ class SpatialMemory:
                 return self._consolidate(keep)
         return fid
 
+    def vote_shape(self, fid: str, shape: str | None, min_votes: int = 3, share: float = 0.7) -> str:
+        """Record a step / pit shape vote (perception.classify_shape); relabel an edge <-> depression once the
+        votes clearly disagree with the kind. Values measured under the old kind are discarded."""
+        f = self.findings[fid]
+        if shape is None or f["kind"] not in ("edge", "depression"):
+            return fid
+        v = f.setdefault("shape_votes", {"step": 0, "pit": 0})
+        v[shape] += 1
+        n = v["step"] + v["pit"]
+        want = "edge" if v["step"] >= share * n else "depression" if v["pit"] >= share * n else None
+        if n >= min_votes and want and want != f["kind"]:
+            for ob in f["observations"]:
+                if ob["value_m"] is not None:
+                    ob["value_m"], ob["provenance"] = None, "detected"
+                ob["kind"] = want
+            f["kind"], f["relabelled"] = want, f"shape votes {v}"
+            f["shape_votes"] = {"step": 0, "pit": 0}
+            self._update(f)
+            return self._consolidate(fid)
+        return fid
+
     def resolve(self, fid: str | None) -> str | None:
         while fid is not None and fid not in self.findings and fid in self.aliases:
             fid = self.aliases[fid]
