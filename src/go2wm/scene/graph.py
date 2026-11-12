@@ -10,6 +10,11 @@ Frame: the tile's scene frame (terrain.py): x along the walk, y across (+y left)
 (0, 0), metres. Built only from the tile params (and the texture seed for cracks), so it is exact
 ground truth; a sensor-built graph can later be scored against it.
 
+Explicit defects in the tile params (sim/defects.py: tree-root upheavals, open cracks, holes, puddles,
+obstructions) become `kind="defect"` nodes with their true sizes and one hazard each; a street tree that caused
+an upheaval is an `asset` node with a `causes` edge. A joint step created by an upheaval keeps its own hazard
+(it is what a sensor measures) and names the upheaval as its `cause`.
+
 Plain dicts (JSON-serialisable): {"nodes": {id: {...}}, "edges": [{"src", "rel", "dst", ...}],
 "hazards": [...], "meta": {...}}.
 """
@@ -22,6 +27,7 @@ from typing import Any
 
 import numpy as np
 
+from ..sim.defects import defect_box, polyline_length
 from ..sim.sidewalk_texture import CURB_W, GUTTER_W, crack_segments, joint_positions
 from ..sim.terrain import params_with_defaults, sidewalk_height
 
@@ -31,6 +37,8 @@ ADA_LEVEL_BEVEL_M = 0.013  # 1/4 to 1/2 in: must be bevelled 1:2; above: must be
 ADA_RUNNING_SLOPE = 1 / 20  # above this a walk is a ramp
 ADA_RAMP_MAX = 1 / 12
 ADA_CROSS_SLOPE = 1 / 48
+ADA_OPENING_M = 0.013  # 302.3: openings must not pass a 1/2 in sphere (cracks, holes, gaps)
+ADA_CLEAR_WIDTH_M = 0.915  # 403.5.1: 36 in minimum clear width of a walking surface
 
 # Go2 + rough-terrain policy, from the E4 sweep (docs/EXPERIMENTS.md): step-ups >= 15 cm stall or
 # fail (15 cm stochastic), ~10 cm passes; 30 % grade stalls at 0.4 m/s, 25 % passes. A placeholder
@@ -115,6 +123,10 @@ def build_scene_graph(terrain: dict[str, Any], tile_index: int = 0, x_range=(-1.
             hazards.append({"id": rid, "type": "running_slope", "value": rise, "box": nodes[rid]["box"], "ada": nodes[rid]["ada"],
                             "robot_risk": nodes[rid]["robot_risk"], "note": f"running slope {abs(rise) * 100:.1f} %"})
 
+    defects = list(p.get("defects") or [])
+    faults = {k: (d["x1"] if d.get("high_end", "x1") == "x1" else d["x0"]) for k, d in enumerate(defects)
+              if d["type"] == "upheaval"}
+
     # --- panels between joints (two per row when the walk has a centre joint), joint displacements
     js = [j for j in joint_positions(p, x_lo, x_hi) if x_lo < j < x_hi]
     bounds = [x_lo] + js + [x_hi]
@@ -141,10 +153,14 @@ def build_scene_graph(terrain: dict[str, Any], tile_index: int = 0, x_range=(-1.
             dzs = [z(a + eps, y) - z(a - eps, y) for y in (-half + 0.05, 0.0, half - 0.05)]
             dz = max(dzs, key=abs)
             if ada_level_class(dz) != "ok":
-                hazards.append({"id": f"joint_{k}", "type": "vertical_displacement", "value_m": dz, "xy": [a, 0.0],
-                                "box": [a - 0.05, a + 0.05, -half, half], "ada": ada_level_class(dz),
-                                "robot_risk": _risk(dz, ROBOT_STEP_RISK) if dz > 0 else "low",
-                                "note": f"{'step up' if dz > 0 else 'step down'} {abs(dz) * 100:.1f} cm at joint x = {a:.2f} m"})
+                hz = {"id": f"joint_{k}", "type": "vertical_displacement", "value_m": dz, "xy": [a, 0.0],
+                      "box": [a - 0.05, a + 0.05, -half, half], "ada": ada_level_class(dz),
+                      "robot_risk": _risk(dz, ROBOT_STEP_RISK) if dz > 0 else "low",
+                      "note": f"{'step up' if dz > 0 else 'step down'} {abs(dz) * 100:.1f} cm at joint x = {a:.2f} m"}
+                cause = [f"defect_{i}_upheaval" for i, xf in faults.items() if abs(xf - a) < 1e-3]
+                if cause:
+                    hz["cause"] = cause[0]
+                hazards.append(hz)
         if len(sides) == 2:
             edge(f"panel_{k}L", "beside", f"panel_{k}R")
 
@@ -159,6 +175,54 @@ def build_scene_graph(terrain: dict[str, Any], tile_index: int = 0, x_range=(-1.
         edge(cid, "on", host)
         hazards.append({"id": cid, "type": "crack", "value_m": L, "box": nodes[cid]["box"], "ada": "monitor",
                         "robot_risk": "none", "note": f"hairline crack, {L:.2f} m long"})
+
+    # --- explicit defects (sim/defects.py)
+    def host_of(x, y):
+        return next((i for i, n in nodes.items() if n["kind"] == "panel" and n["box"][0] <= x < n["box"][1]
+                     and n["box"][2] <= y <= n["box"][3]), "walkway")
+
+    for k, d in enumerate(defects):
+        t = d["type"]
+        b = [float(v) for v in defect_box(d)]
+        did = f"defect_{k}_{t}"
+        cx, cy = 0.5 * (b[0] + b[1]), 0.5 * (b[2] + b[3])
+        if t == "upheaval":
+            lift, xe = float(d["lift"]), float(faults[k])
+            a = {"label": f"tree-root upheaval +{lift * 100:.1f} cm", "lift_m": lift, "fault_x": xe,
+                 "ada": ada_level_class(lift), "robot_risk": _risk(lift, ROBOT_STEP_RISK),
+                 "note": f"panel lifted {lift * 100:.1f} cm at x = {xe:.2f} m (tree roots)"}
+        elif t == "crack":
+            w, L = float(d["width"]), polyline_length(d["points"])
+            a = {"label": f"open crack {w * 1000:.0f} mm x {L:.2f} m", "width_m": w, "depth_m": float(d["depth"]),
+                 "length_m": L, "polyline": d["points"], "ada": "violation" if w > ADA_OPENING_M else "monitor",
+                 "robot_risk": "low" if w > 0.03 else "none",
+                 "note": f"open crack {w * 1000:.0f} mm wide, {d['depth'] * 1000:.0f} mm deep, {L:.2f} m long"}
+            mid = np.asarray(d["points"])[len(d["points"]) // 2]
+            cx, cy = float(mid[0]), float(mid[1])
+        elif t == "hole":
+            dia, dep = 2 * max(d["rx"], d["ry"]), float(d["depth"])
+            risk = "high" if dep >= 0.08 and min(d["rx"], d["ry"]) >= 0.10 else "medium" if dep >= 0.04 else "low"
+            a = {"label": f"hole {dia * 100:.0f} cm, {dep * 100:.0f} cm deep", "diameter_m": dia, "depth_m": dep,
+                 "ada": "violation" if dia > ADA_OPENING_M else "monitor", "robot_risk": risk,
+                 "note": f"pothole / missing concrete {dia * 100:.0f} cm across, {dep * 100:.0f} cm deep (foot can drop in)"}
+        elif t == "puddle":
+            area = float(np.pi * d["rx"] * d["ry"])
+            a = {"label": f"puddle {area:.2f} m2", "area_m2": area, "depth_m": float(d["depth"]), "ada": "n/a",
+                 "robot_risk": "low",
+                 "note": f"standing water {area:.2f} m2 (ponding): slip risk; depth sensors lose returns on water"}
+        else:  # obstruction
+            clear = float(max(half - (d["y"] + d["r"]), (d["y"] - d["r"]) + half))
+            a = {"label": f"{d.get('kind', 'object')} on the walk", "clear_width_m": clear,
+                 "ada": "violation" if clear < ADA_CLEAR_WIDTH_M else "ok", "robot_risk": "medium",
+                 "note": f"{d.get('kind', 'object')} leaves {clear:.2f} m clear width (ADA min 0.915 m)"}
+        note = a.pop("note")
+        node(did, kind="defect", defect=t, box=b, xy=[cx, cy], **a)
+        edge(did, "on", host_of(cx, cy))
+        if t == "upheaval" and d.get("tree"):
+            tid = node(f"tree_{k}", kind="asset", label="street tree", xy=[float(v) for v in d["tree"]])
+            edge(tid, "causes", did)
+        hazards.append({"id": did, "type": t, "box": b, "xy": [cx, cy], "ada": a["ada"], "robot_risk": a["robot_risk"],
+                        "note": note, **{k_: v for k_, v in a.items() if k_.endswith(("_m", "_m2"))}})
 
     return {"meta": {"name": name or f"tile_{tile_index}", "tile_index": tile_index, "x_range": [x_lo, x_hi],
                      "frame": "tile scene frame: x along walk, y across (+y left), start at (0, 0), metres",

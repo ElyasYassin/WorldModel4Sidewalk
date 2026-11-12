@@ -151,4 +151,8 @@ def sidewalk_albedo(x, y, p: dict[str, Any] | None, seed: int = 0, cracks: bool 
         for pts in crack_segments(p, seed):
             w[_dist_to_polyline(xw, yw, pts) < 0.004] *= 0.5
     img[walk] = w
+    if p["defects"]:
+        from .defects import paint_defects
+
+        img = paint_defects(img, x, y, p["defects"], half, value_noise)
     return np.clip(img, 0.0, 1.0)

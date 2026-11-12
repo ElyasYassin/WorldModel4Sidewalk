@@ -788,3 +788,29 @@ lateral commands. It stands still for small planar commands, including all turn-
 - **Status.** Parked on 2026-11-11 when the project was repositioned on the Phase 1 inspection demo. What carries
   over: the fused D555 + L1 map is the sensor map for Phase 1 perception (accuracy: E4-C (1) and (3)); pretrained
   image features need far more tile variety, regularization or a different design before they are worth revisiting.
+
+## Phase 1, step 1: sidewalk defect library (2026-11-11)
+
+- **Purpose.** Realistic things to inspect (Phase 1 repositioning). One parametric description per defect drives the
+  geometry, appearance, sensor effects and the ground-truth scene graph (`go2wm.sim.defects`; tile params
+  `"defects": [...]`).
+- **Core types.**
+
+| type | geometry | appearance | sensors | scene graph (ADA, robot risk) |
+|---|---|---|---|---|
+| tree-root upheaval | half or full panel tilted up to `lift` (1–8 cm), vertical fault at the high joint | lighter panel, shadowed fault edge; tree, soil and surface roots on the verge | measured as a joint step | level change (303); risk from the E4 step thresholds; tree = `asset` node `causes` it; the joint hazard names it as `cause` |
+| open crack | groove, width 3–30 mm, depth 5–30 mm; sub-grid cracks rasterised with the same cross-section area | dark line with halo | mostly visual (too thin for depth beyond close range) | opening > ½ in (302.3) = violation, else monitor |
+| hole / pothole | steep-walled elliptical depression, 3–15 cm deep | soil interior, broken rim | geometry | opening = violation; risk high if ≥ 8 cm deep and ≥ 20 cm wide |
+| puddle | shallow bowl (0.8–2.5 cm) | water (dark, bluish, sky), wet rim | `range_dropout`: 85 % of depth-camera and 60 % of LiDAR returns lost on water | ponding, ADA n/a, slip risk low |
+| obstruction (bin, pole, debris) | none (a SceneSpec obstacle) | – | geometry | clear width < 36 in (403.5.1) = violation |
+
+- **Grid.** Defect tiles use a 2 cm / 1 mm height field (was 5 cm / 5 mm); a 24 × 7 m tile is 1200 × 350 cells.
+  `terrain.random_defect_tile` makes tiles with mild grade, cross slope and curb plus 4–8 non-overlapping defects
+  in x ∈ [−L/2 + 3, L/2 − 1.5] (route start area clear).
+- **Not modelled.** Per-region friction (one physics material per terrain, so puddles are not slippery in physics);
+  water's own surface (rays that survive the dropout hit the bowl floor).
+- **Offline check.** `python scripts/defect_tiles.py --n 6 --seed 0` → `outputs/defect_tiles/` (params, graph JSON,
+  three-view PNG per tile). Seed 0: 5–7 defects and 9–15 hazards per tile, 2–7 ADA violations. Tests:
+  `tests/test_defects.py`.
+- **Next.** Isaac smoke test on these tiles (mesh build, texture, rough policy over upheavals and holes, obstacles
+  from `obstacles_from_defects`, puddle dropout hooked into the sensor rig), then the mission scene and runner.

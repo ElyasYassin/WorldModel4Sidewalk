@@ -12,6 +12,8 @@ Features (all optional, all deterministic from the params dict):
   curb_drop     drop [m] from the walkway edge at y = -w/2 down to a road surface (a curb)
   friction      terrain static = dynamic friction coefficient (Isaac multiplies it with the
                 robot foot material, 0.8 static / 0.6 dynamic in the Go2 rough task)
+  defects       list of sidewalk defects (upheaval, crack, hole, puddle, obstruction): see sim/defects.py.
+                Defect tiles use a finer grid (horizontal_scale 0.02, vertical_scale 0.001).
 
 `sidewalk_height(x, y, p)` is the analytic surface [m]; `sidewalk_heightfield` samples it on the
 Isaac grid. Both are pure numpy so they can be tested without the simulator.
@@ -31,6 +33,7 @@ DEFAULTS: dict[str, Any] = {
     "slabs": [],
     "curb_drop": 0.0,
     "friction": 1.0,
+    "defects": [],
     "horizontal_scale": 0.05,
     "vertical_scale": 0.005,
 }
@@ -42,8 +45,9 @@ def params_with_defaults(p: dict[str, Any] | None) -> dict[str, Any]:
     return out
 
 
-def sidewalk_height(x, y, p: dict[str, Any]) -> np.ndarray:
-    """Surface height [m] at scene coordinates (broadcasts). 0 at the start (0, 0)."""
+def sidewalk_height(x, y, p: dict[str, Any], grid: float = 0.0) -> np.ndarray:
+    """Surface height [m] at scene coordinates (broadcasts). 0 at the start (0, 0) unless a defect is there.
+    `grid` > 0 rasterises sub-grid defects (narrow cracks) for a height field of that spacing."""
     p = params_with_defaults(p)
     x, y = np.broadcast_arrays(np.asarray(x, dtype=np.float64), np.asarray(y, dtype=np.float64))
     half = 0.5 * p["width"]
@@ -54,6 +58,10 @@ def sidewalk_height(x, y, p: dict[str, Any]) -> np.ndarray:
         z = z + np.where((x >= x0) & (x < x0 + length), h, 0.0)
     if p["curb_drop"] > 0:
         z = np.where(y < -half, z - p["curb_drop"], z)
+    if p["defects"]:
+        from .defects import defect_height
+
+        z = z + defect_height(x, y, p["defects"], grid)
     return z
 
 
@@ -68,7 +76,7 @@ def sidewalk_heightfield(size: tuple[float, float], horizontal_scale: float, ver
     ny = int(round(size[1] / horizontal_scale))
     xs = np.arange(nx) * horizontal_scale - 0.5 * size[0]
     ys = np.arange(ny) * horizontal_scale - 0.5 * size[1]
-    z = sidewalk_height(xs[:, None], ys[None, :], p)
+    z = sidewalk_height(xs[:, None], ys[None, :], p, grid=horizontal_scale)
     return np.round(z / vertical_scale).astype(np.int16)
 
 
@@ -93,6 +101,21 @@ def random_sidewalk_tile(rng: np.random.Generator, slab_max: float = 0.18, grade
     else:
         p["grade"] = []
     p["curb_drop"] = round(float(rng.uniform(0.08, curb_max)), 3) if rng.uniform() < 0.6 else 0.0
+    return p
+
+
+def random_defect_tile(rng: np.random.Generator, length: float = 24.0, n_defects: int | None = None,
+                       types=None) -> dict[str, Any]:
+    """A sidewalk tile with mild geometry (grade, cross slope, curb; no flat-raised slabs: upheavals replace
+    them) and 4-8 defects on the fine defect grid. The tile is centred on the scene origin, so the walk spans
+    x in [-length/2, length/2]; defects go in [-length/2 + 3, length/2 - 1.5] (the first 3 m are left clear for
+    a route start at x = -length/2 + 1)."""
+    from .defects import DEFECT_TYPES, random_defects
+
+    p = random_sidewalk_tile(rng, slab_max=0.04, grade_max=0.08, cross_max=0.03, curb_max=0.15)  # slabs dropped below
+    p["slabs"] = []
+    p.update({"size": [length, 7.0], "horizontal_scale": 0.02, "vertical_scale": 0.001})
+    p["defects"] = random_defects(rng, p, (-length / 2 + 3.0, length / 2 - 1.5), n_defects, types or DEFECT_TYPES)
     return p
 
 
