@@ -158,11 +158,14 @@ def paint_defects(img: np.ndarray, x: np.ndarray, y: np.ndarray, defects: list[d
                     m = (dist_to_polyline(x, y, np.array(pts)) < 0.025) & (np.abs(y) > half_width - 0.02)
                     img[m] = ROOT
         elif t == "crack":
+            # true width: the crack's shadowed interior is dark (x0.3); a slightly darker, weathered band around it.
+            # Cameras resolve narrow cracks by supersampling (sim/synthetic_camera.py); the Isaac texture is baked at
+            # 2 cm/px, so cracks narrower than that look faint there.
             dist = dist_to_polyline(x, y, d["points"])
-            core = dist < max(d["width"] / 2, 0.005)
-            img[core] *= 0.30 + 0.25 * np.clip(1 - d["width"] / 0.012, 0, 1)
-            halo = (dist >= max(d["width"] / 2, 0.005)) & (dist < d["width"] / 2 + 0.015)
-            img[halo] *= 0.85
+            core = dist < d["width"] / 2
+            img[core] *= 0.30
+            halo = (dist >= d["width"] / 2) & (dist < d["width"] / 2 + 0.006)
+            img[halo] *= 0.88
         elif t == "hole":
             jag = 1.0 + 0.08 * noise(x, y, 0.04, 1200 + k)
             r = ellipse_r(x, y, d) / jag
