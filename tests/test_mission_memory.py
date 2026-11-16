@@ -94,3 +94,22 @@ def test_short_edge_inside_a_hole_is_its_wall_and_static_views_do_not_count():
     o = _det(0.3, "depression", 1.0, 0.0)
     o.extra["view_xy"] = [0.3, 0.0]
     assert m2.is_real(m2.add(o))
+
+
+def test_robust_hole_depth_ignores_partial_views_and_one_spurious_deep_reading():
+    """Approaching a 110 mm hole, the D405 first sees only its near part (shallow readings); the robust depth uses
+    the readings near the top, judged against the 2nd-largest, so a single spurious deep reading cannot set the bar."""
+    for extra in ([], [0.634]):
+        m = SpatialMemory((-5.0, 5.0, -1.5, 1.5), [0.0, 5.0], robust=True)
+        fid = m.add(_det(0.0, "depression", 1.0, 0.0))
+        for k, v in enumerate([0.0013, 0.0124, 0.0446, 0.0902, 0.1162, 0.1096, 0.1101] + extra):
+            m.add(Observation(1.0 + 0.1 * k, "depth_d405", "depression", np.array([1.0, 0.0]), 0.5, value_m=v,
+                              confidence=0.95))
+        assert abs(m.findings[fid]["value_m"] - 0.110) < 0.004
+    # non-robust memory keeps the plain mean of the best-sensor readings (frozen evaluations)
+    m = _mem()
+    fid = m.add(_det(0.0, "depression", 1.0, 0.0))
+    for k, v in enumerate([0.02, 0.11, 0.11]):
+        m.add(Observation(1.0 + 0.1 * k, "depth_d405", "depression", np.array([1.0, 0.0]), 0.5, value_m=v,
+                          confidence=0.95))
+    assert abs(m.findings[fid]["value_m"] - 0.08) < 1e-9

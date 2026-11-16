@@ -28,6 +28,7 @@ class SpatialMemory:
         # robust=True: a finding's value is the median of the best-sensor readings after dropping outliers
         # (> 3 MAD, min 4 mm, from the median) instead of their mean. Off by default (frozen evaluations).
         self.robust = robust
+        self.partial_frac = 0.85  # robust depressions: readings below this share of the 2nd-largest are partial views
         x0, x1, y0, y1 = walk_bounds
         self.nx, self.ny = int(np.ceil((x1 - x0) / cell)), int(np.ceil((y1 - y0) / cell))
         self.seen: dict[str, np.ndarray] = {}
@@ -164,6 +165,12 @@ class SpatialMemory:
         vals = np.array([o["value_m"] for o in meas])
         best_conf = float(mw.max())
         top = vals[mw >= best_conf - 1e-9]
+        if self.robust and f.get("kind") == "depression" and len(top) >= 3:
+            # a partial view (the close camera sees only the near part of a hole while approaching) can only read
+            # a hole SHALLOW: keep the readings near the top, judged against the 2nd-largest so that one spurious
+            # deep reading cannot set the bar
+            top = np.sort(top)
+            top = top[top >= self.partial_frac * top[-2]]
         if self.robust and len(top) >= 3:
             med = float(np.median(top))
             mad = float(np.median(np.abs(top - med)))
