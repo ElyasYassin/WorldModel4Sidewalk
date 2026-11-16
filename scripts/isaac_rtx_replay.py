@@ -36,6 +36,7 @@ ap.add_argument("--sky", default="NVIDIA/Assets/Skies/Cloudy/kloofendal_48d_part
 ap.add_argument("--no-people", action="store_true")
 ap.add_argument("--robot-usd", default=None, help="robot USD (default: NVIDIA's Go2); Go2-W: D:/go2wm/cache/go2w_usd/go2w_description.usd")
 ap.add_argument("--no-trees", action="store_true")
+ap.add_argument("--settle", type=int, default=2, help="app updates after posing each frame (pushes link poses to the renderer)")
 a = ap.parse_args()
 
 from isaacsim import SimulationApp  # noqa: E402
@@ -541,6 +542,17 @@ if not a.no_people:
 # ---------------------------------------------------------------------------------------------- robot
 go2 = stage.DefinePrim("/World/Go2", "Xform")
 go2.GetReferences().AddReference(a.robot_usd or f"{ASSETS}/Isaac/Robots/Unitree/Go2/go2.usd")
+# replay only: strip the robot's physics. The Go2-W USD carries rigid bodies + joints (its physics layer), and every
+# render step advances the simulation, so gravity pulled the posed links a little further into the slab each frame
+from pxr import UsdPhysics  # noqa: E402
+
+for prim in Usd.PrimRange(go2):
+    if prim.HasAPI(UsdPhysics.RigidBodyAPI):
+        UsdPhysics.RigidBodyAPI(prim).CreateRigidBodyEnabledAttr(False)
+    if prim.HasAPI(UsdPhysics.ArticulationRootAPI):
+        prim.RemoveAPI(UsdPhysics.ArticulationRootAPI)
+    if prim.IsA(UsdPhysics.Joint):
+        prim.SetActive(False)
 for _ in range(3):
     app.update()
 link_ops = {}
@@ -633,7 +645,9 @@ if a.test:
         for _ in range(30):
             app.update()
         render_to(out_dir / f"test_t{t:.0f}.png")
-        print(f"[rtx] test frame t={t}", flush=True)
+        bb = UsdGeom.BBoxCache(Usd.TimeCode.Default(), ["default", "render"]).ComputeWorldBound(go2).ComputeAlignedRange()
+        base = links[k_at(t)]["pos"][0]
+        print(f"[rtx] test frame t={t}: robot bbox {bb.GetMin()} .. {bb.GetMax()}, recorded base {base}", flush=True)
 else:
     tl = json.loads(Path(a.timeline).read_text())
     frames = tl["frames"]
@@ -645,6 +659,10 @@ else:
             continue
         pose_scene(f["t"])
         set_camera(f["eye"], f["foc"])
+        # push the new link poses to the renderer: the Go2-W USD's links carry rigid-body schemas, and without an
+        # update the renderer keeps their load-time pose (the robot then stands at the origin, legs in the slab)
+        for _ in range(a.settle):
+            app.update()
         render_to(dst)
         if i % 50 == 0:
             print(f"[rtx] frame {i}/{len(frames)}", flush=True)
