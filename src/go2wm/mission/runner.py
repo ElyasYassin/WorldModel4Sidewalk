@@ -27,11 +27,30 @@ from ..sim.mock import FAMILY_PARAMS, MockGo2Sim, _stable_seed
 from ..sim.offline_sensors import OfflineRig, quat_to_R
 from ..sim.terrain import params_with_defaults, sidewalk_height
 from .memory import SpatialMemory
-from .perception import (classify_shape, detect_candidates, detect_dropouts, expected_hits, in_view, measure,
+from .perception import (classify_shape, curb_lateral, detect_candidates, detect_dropouts, expected_hits, in_view, measure,
                          to_robot, to_world)
 from .scene import sidewalk_mission_scene
+from .site import SiteActors
 
 D405_STANDOFF = 0.52  # m ahead of the base: centre of the D405 measuring zone
+POSTURE_STANDOFF = 0.45  # same in the inspection posture (crouch 5 cm, body level; Isaac: axis ~0.43-0.47 m)
+
+
+def d405_axis_ahead(obs, H) -> float:
+    """Where the D405's optical axis meets the ground, metres ahead of the base (from the body attitude: IMU and
+    leg kinematics give it on the real robot)."""
+    from ..sim.sensors import SENSOR_SPECS, pitch_matrix
+
+    spec = SENSOR_SPECS["depth_d405"]
+    R = quat_to_R(obs.quat_w)
+    cam = obs.pos_w + R @ np.asarray(spec["mount_pos"])
+    ax = R @ pitch_matrix(spec["pitch_deg"]) @ np.array([1.0, 0.0, 0.0])
+    if ax[2] > -0.05:
+        return D405_STANDOFF
+    s = (float(H(obs.pos_w[0], obs.pos_w[1])) - cam[2]) / ax[2]
+    hit = cam + s * ax
+    hd = np.array([np.cos(obs.pose2d[2]), np.sin(obs.pose2d[2])])
+    return float((hit[:2] - obs.pos_w[:2]) @ hd)
 
 
 class MockMissionSim(MockGo2Sim):
@@ -77,7 +96,22 @@ class PoseErrors:
             self.err[:2] += self.rng.normal(size=2) * self.p.get("odom_xy", 0.0) * d
             self.err[2] += self.rng.normal() * self.p.get("odom_yaw", 0.0) * d
         self.last = pose.copy()
-        c, s = np.cos(self.err[2]), np.sin(self.err[2])  # yaw error rotates the path about the start
+        return self.estimate_static(pose)
+
+    def correct(self, dy: float, dyaw: float):
+        """Apply a measured correction (curb localisation): heading first (it rotates the estimate about the start),
+        then a lateral shift so the corrected estimate moves by exactly `dy` in y at the current pose."""
+        if self.last is None:
+            return
+        before = self.estimate_static(self.last)
+        self.err[2] -= dyaw
+        after = self.estimate_static(self.last)
+        self.err[:2] -= after[:2] - before[:2]  # keep the position; only the heading changes
+        self.err[1] += dy
+
+    def estimate_static(self, pose: np.ndarray) -> np.ndarray:
+        """Current estimate of `pose` without advancing the drift (the yaw error rotates the path about the start)."""
+        c, s = np.cos(self.err[2]), np.sin(self.err[2])
         x, y = pose[0] - self.origin[0], pose[1] - self.origin[1]
         return np.array([self.origin[0] + c * x - s * y + self.err[0], self.origin[1] + s * x + c * y + self.err[1],
                          pose[2] + self.err[2]])
@@ -93,7 +127,8 @@ class PoseErrors:
 
 class Policy:
     def __init__(self, name: str, slow_speed: float = 0.3, dwell: int = 5, reach: float = 0.10,
-                 align: bool = False, budget_steps: int = 80, avoid_holes: bool = False):
+                 align: bool = False, budget_steps: int = 80, avoid_holes: bool = False,
+                 posture: tuple[float, float] | None = None, posture_dwell: int = 10, dyn_d405: bool = False):
         """approach: `reach` = stand-off tolerance [m]; `align` = turn in place to face the finding before the
         dwell (a legged robot arrives at the stand-off with any heading; the kinematic mock arrives facing +x);
         `budget_steps` = give up after this many control steps."""
@@ -101,6 +136,13 @@ class Policy:
         self.name, self.slow_speed, self.dwell = name, slow_speed, dwell
         self.reach, self.align, self.budget_steps = reach, align, budget_steps
         self.avoid_holes = avoid_holes  # route around confirmed holes (any strategy): a legged robot can fall in
+        # approach: at the stand-off, crouch and pitch nose-down (drop [m], absolute pitch [rad]) for the D405 close-up
+        # (backends with set_posture only, e.g. Isaac); hold it for `posture_dwell` steps once settled
+        self.posture, self.posture_dwell, self.posing = posture, posture_dwell, False
+        self.no_posture, self.skipped0 = False, 0
+        # gate D405 measurements on where its optical axis actually meets the ground (body height / pitch) and
+        # pick the stand-off from it, instead of the Go2's fixed 0.42-0.62 m zone (e.g. the taller Go2-W)
+        self.dyn_d405 = dyn_d405
         self.tried: set[str] = set()
         self.budget = 0
         self.target: str | None = None
@@ -109,7 +151,13 @@ class Policy:
 
 def run_mission(sim, controller, terrain: dict[str, Any], policy: Policy, profile: str = "realistic",
                 seed: int = 0, max_steps: int = 900, nav_cfg: dict[str, Any] | None = None,
-                detect_every: int = 1, log=print, pose_errors: bool = False, on_step=None) -> dict[str, Any]:
+                detect_every: int = 1, log=print, pose_errors: bool = False, on_step=None,
+                robust_memory: bool = False, curb_aware: bool = False, curb_gain: float = 0.3,
+                curb_gain_yaw: float = 0.05) -> dict[str, Any]:
+    """curb_aware: (1) detection ignores cells at a curb found in the depth frame itself, instead of trusting the
+    map walkway edge under the drifting pose estimate; (2) with pose errors, the lateral estimate is pulled toward the
+    curb seen in the frame (`curb_gain` per frame) and the heading toward its direction (`curb_gain_yaw`; the curb's world position is known from the map), like a robot
+    localising against a curb or wall. Off by default (the earlier evaluations ran without it)."""
     from ..planning.global_waypoints import GlobalPlanner, WaypointTracker
 
     nc = {"grid_resolution": 0.1, "inflation_margin": 0.15, "waypoint_spacing": 1.0, "waypoint_tolerance": 0.5,
@@ -121,7 +169,7 @@ def run_mission(sim, controller, terrain: dict[str, Any], policy: Policy, profil
     H = lambda x, y: sidewalk_height(x, y, p)  # noqa: E731
     rig = OfflineRig(["depth_d555", "depth_d405"], profile, seed=seed, defects=p.get("defects"))
     route_x = [w[0] for w in scene.params["route"]]
-    mem = SpatialMemory((scene.bounds[0], scene.bounds[1], -half, half), route_x)
+    mem = SpatialMemory((scene.bounds[0], scene.bounds[1], -half, half), route_x, robust=robust_memory)
     gp = GlobalPlanner(nc["grid_resolution"], sim.robot_radius + nc["inflation_margin"], nc["waypoint_spacing"])
     hazards: tuple = ()
 
@@ -139,6 +187,15 @@ def run_mission(sim, controller, terrain: dict[str, Any], policy: Policy, profil
         sc.scene_id = scene.scene_id + "+holes:" + ",".join(hazards)  # the planner caches its grid per scene id
         return sc
 
+    def replan(xy):
+        """Route to the goal around confirmed holes; without them if no such route exists (e.g. holes, or a
+        drifted hole estimate, closing the walk), rather than ending the mission."""
+        try:
+            return WaypointTracker(gp.plan(plan_scene(), xy, scene.goal), nc["waypoint_tolerance"])
+        except RuntimeError as e:
+            events.append({"t": t_s, "event": "replan_failed", "error": str(e)[:80]})
+            return WaypointTracker(gp.plan(scene, xy, scene.goal), nc["waypoint_tolerance"])
+
     tracker = WaypointTracker(gp.plan(scene, obs.pos_w[:2], scene.goal), nc["waypoint_tolerance"])
     controller.reset(scene, obs)
     events, traj, est, t0 = [], [], [], time.perf_counter()
@@ -147,6 +204,11 @@ def run_mission(sim, controller, terrain: dict[str, Any], policy: Policy, profil
     if perr is not None:
         perr.origin = obs.pose2d[:2].copy()
     prev_obs, prev_dt = None, sim.control_dt
+    actors = SiteActors(p.get("site"))  # moving people (demo missions); empty for ordinary tiles
+    site_track, yielding = [], False
+    use_posture = policy.name == "approach" and policy.posture is not None and hasattr(sim, "set_posture")
+    posture_log = []
+    n_curb_fix = 0
     for step in range(max_steps):
         true_pose = obs.pose2d
         pose = perr.estimate(true_pose) if perr is not None else true_pose  # the robot's belief (default: truth)
@@ -174,7 +236,18 @@ def run_mission(sim, controller, terrain: dict[str, Any], policy: Policy, profil
             from ..sim.offline_sensors import bin_base_points
 
             e, c = bin_base_points(pts["depth_d555"], R)
-            for ob in detect_candidates(e, c, pose, t_s, half):
+            if curb_aware and perr is not None and p.get("curb_drop", 0.0) > 0.05 and abs(np.cos(pose[2])) > 0.95:
+                cl = curb_lateral(e, with_angle=True)
+                if cl is not None:
+                    yc, ang = cl
+                    corr = -half - (pose[1] + np.cos(pose[2]) * yc)  # the curb is at y = -half (road side)
+                    # the curb runs along world x: in the robot frame it lies at -yaw (heading +x) or pi - yaw
+                    yaw_meas = -ang if np.cos(pose[2]) > 0 else np.pi - ang
+                    dyaw = (pose[2] - yaw_meas + np.pi) % (2 * np.pi) - np.pi
+                    if abs(corr) < 0.5 and abs(dyaw) < 0.1:
+                        perr.correct(curb_gain * corr, curb_gain_yaw * dyaw)
+                        n_curb_fix += 1
+            for ob in detect_candidates(e, c, pose, t_s, half, curb_drop=0.08 if curb_aware else 0.0):
                 mem.add(ob)
             ground = float(obs.pos_w[2] - sidewalk_height(obs.pos_w[0], obs.pos_w[1], p))  # height above ground (legs)
             for ob in detect_dropouts(c, expected_hits("depth_d555", R, ground), pose, t_s, half):
@@ -184,8 +257,12 @@ def run_mission(sim, controller, terrain: dict[str, Any], policy: Policy, profil
                 continue
             if not mem.is_real(fid) or f["kind"] == "dropout":  # dropouts need a camera, not a depth measurement
                 continue
+            zone = None
+            if policy.posing or policy.dyn_d405:  # gate on where the D405 actually looks (crouch, taller robot)
+                c405 = d405_axis_ahead(obs, H)
+                zone = (c405 - 0.12, c405 + 0.12, 0.15)
             for s in ("depth_d405", "depth_d555"):
-                if in_view(s, pose, np.asarray(f["xy"])):
+                if in_view(s, pose, np.asarray(f["xy"]), d405_zone=zone):
                     m = measure(pts[s], pose, np.asarray(f["xy"]), f["kind"], s, t_s)
                     if m is not None:
                         mem.add(m)
@@ -226,6 +303,7 @@ def run_mission(sim, controller, terrain: dict[str, Any], policy: Policy, profil
                     if (fid not in policy.tried and f["kind"] != "dropout" and 0.9 <= ahead <= 3.0
                             and mem.needs_close_look(fid)):
                         policy.target, policy.dwell_left, policy.budget = fid, policy.dwell, policy.budget_steps
+                        policy.no_posture = False
                         policy.tried.add(fid)
                         events.append({"t": t_s, "event": "approach", "finding": fid})
                         break
@@ -234,12 +312,36 @@ def run_mission(sim, controller, terrain: dict[str, Any], policy: Policy, profil
                 policy.target = None
             if policy.target is not None:
                 f = mem.findings[policy.target]
-                sxy = np.array([f["xy"][0] - D405_STANDOFF, np.clip(f["xy"][1], -half + 0.35, half - 0.35)])
+                so = POSTURE_STANDOFF if use_posture else D405_STANDOFF
+                if policy.dyn_d405 and not use_posture:  # stand-off = where the standing D405 looks
+                    so = float(np.clip(d405_axis_ahead(obs, H), 0.3, 0.9))
+                sxy = np.array([f["xy"][0] - so, np.clip(f["xy"][1], -half + 0.35, half - 0.35)])
                 policy.budget -= 1
                 if policy.budget <= 0:  # give up after 8 s (unreachable stand-off, e.g. behind an obstacle)
                     events.append({"t": t_s, "event": "approach_aborted", "finding": policy.target})
                     policy.target = None
-                    tracker = WaypointTracker(gp.plan(plan_scene(), obs.pos_w[:2], scene.goal), nc["waypoint_tolerance"])
+                    if policy.posing:
+                        sim.set_posture(0.0, 0.0)
+                        policy.posing = False
+                        events.append({"t": t_s, "event": "posture_stand"})
+                    tracker = replan(obs.pos_w[:2])
+                elif policy.posing and getattr(sim, "posture_skipped", 0) > policy.skipped0:
+                    # the backend refused the posture (a foot under the body): plain standing close-up instead
+                    policy.posing, policy.dwell_left = False, policy.dwell
+                    turn, cap = np.zeros(3), 0.0
+                    events.append({"t": t_s, "event": "posture_skipped", "finding": policy.target})
+                elif policy.posing:  # hold the inspection posture (velocity commands are ignored meanwhile)
+                    turn, cap = np.zeros(3), 0.0
+                    settled = sim.posture_state()[2]
+                    if settled:
+                        policy.dwell_left -= 1
+                    if settled and policy.dwell_left <= 0:
+                        events.append({"t": t_s, "event": "inspected", "finding": policy.target,
+                                       "status": mem.findings[policy.target]["status"]})
+                        sim.set_posture(0.0, 0.0)
+                        events.append({"t": t_s, "event": "posture_stand"})
+                        policy.posing, policy.target = False, None
+                        tracker = replan(obs.pos_w[:2])
                 elif (dist := float(np.linalg.norm(obs.pos_w[:2] - sxy))) > policy.reach:
                     wp = sxy
                     cap = 0.4
@@ -253,6 +355,14 @@ def run_mission(sim, controller, terrain: dict[str, Any], policy: Policy, profil
                 elif policy.align and abs(yerr := float((np.arctan2(f["xy"][1] - true_pose[1], f["xy"][0] - true_pose[0])
                                                         - true_pose[2] + np.pi) % (2 * np.pi) - np.pi)) > 0.15:
                     turn = np.array([0.0, 0.0, np.sign(yerr) * float(np.clip(1.5 * abs(yerr), 0.6, 0.9))])  # face it
+                elif use_posture and not policy.no_posture:  # at the stand-off, facing it: crouch + pitch down
+                    policy.skipped0 = getattr(sim, "posture_skipped", 0)
+                    policy.no_posture = True  # one posture attempt per target
+                    sim.set_posture(*policy.posture)
+                    policy.posing, policy.dwell_left = True, policy.posture_dwell
+                    turn, cap = np.zeros(3), 0.0
+                    events.append({"t": t_s, "event": "posture_inspect", "finding": policy.target,
+                                   "drop_m": policy.posture[0], "pitch_rad": policy.posture[1]})
                 else:
                     policy.dwell_left -= 1
                     cap = 0.0
@@ -260,7 +370,32 @@ def run_mission(sim, controller, terrain: dict[str, Any], policy: Policy, profil
                         events.append({"t": t_s, "event": "inspected", "finding": policy.target,
                                        "status": mem.findings[policy.target]["status"]})
                         policy.target = None
-                        tracker = WaypointTracker(gp.plan(plan_scene(), obs.pos_w[:2], scene.goal), nc["waypoint_tolerance"])
+                        tracker = replan(obs.pos_w[:2])
+        # --- people: yield while one is in the corridor ahead, slow down near people (ground-truth tracks stand in
+        # for a person detector)
+        people = actors.update(t_s, obs.pos_w[:2]) if len(actors) else np.zeros((0, 5))
+        if len(actors):
+            site_track.append(people[:, [0, 1, 3, 4]].round(3).tolist())
+            if hasattr(sim, "set_movers"):
+                sim.set_movers(people[:, :2])
+            near = False
+            block = None
+            for x_, y_, r_, _, _ in people:
+                xr, yr = to_robot(true_pose, x_, y_)
+                if 0.0 < xr < 1.4 + r_ and abs(yr) < 0.45 + r_:
+                    block = (x_, y_)
+                near = near or float(np.hypot(x_ - obs.pos_w[0], y_ - obs.pos_w[1])) < 2.5
+            if block is not None:
+                if not yielding:
+                    events.append({"t": t_s, "event": "yield_pedestrian", "xy": [float(block[0]), float(block[1])]})
+                yielding = True
+                turn, cap = np.zeros(3), 0.0
+            else:
+                if yielding:
+                    events.append({"t": t_s, "event": "resume_after_yield"})
+                yielding = False
+                if near and turn is None:
+                    cap = 0.45 if cap is None else min(cap, 0.45)
         a, _ = controller.act(obs, wp)
         if turn is not None:  # direct command from the approach (align mode)
             a = np.asarray(turn, dtype=a.dtype)
@@ -269,6 +404,8 @@ def run_mission(sim, controller, terrain: dict[str, Any], policy: Policy, profil
             a[0] = min(a[0], cap)
             if cap == 0.0:
                 a[:] = 0.0
+        if use_posture:
+            posture_log.append(round(float(sim.posture_state()[0]), 4))
         res = sim.step(VelocityCommand.from_action(a, sim.control_dt))
         prev_dt = res.info.get("dt_s", sim.control_dt)
         t_s += prev_dt
@@ -280,7 +417,8 @@ def run_mission(sim, controller, terrain: dict[str, Any], policy: Policy, profil
     return {"outcome": outcome, "time_s": t_s, "steps": len(traj), "policy": policy.name, "profile": profile,
             "path_m": float(np.linalg.norm(np.diff(traj[:, :2], axis=0), axis=1).sum()) if len(traj) > 1 else 0.0,
             "trajectory": traj.tolist(), "pose_estimate": est if perr is not None else None,
-            "pose_errors": perr is not None, "events": events, "memory": mem.to_dict(), "wall_s": time.perf_counter() - t0}
+            "pose_errors": perr is not None, "robust_memory": robust_memory, "curb_aware": curb_aware, "curb_fixes": n_curb_fix, "events": events, "site_track": site_track, "posture_log": posture_log, "posture_aborts": getattr(sim, "posture_aborts", 0),
+            "posture_skipped": getattr(sim, "posture_skipped", 0), "memory": mem.to_dict(), "wall_s": time.perf_counter() - t0}
 
 
 def score_mission(result: dict[str, Any], terrain: dict[str, Any]) -> dict[str, Any]:

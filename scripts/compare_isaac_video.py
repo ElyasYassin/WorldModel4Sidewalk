@@ -35,7 +35,7 @@ from PIL import Image, ImageDraw  # noqa: E402
 from go2wm.common.config import resolve_path  # noqa: E402
 from go2wm.sim.sidewalk_texture import sidewalk_albedo  # noqa: E402
 from go2wm.sim.terrain import params_with_defaults, sidewalk_height  # noqa: E402
-from render_isaac_mission import KIND, font, quat_R, running_value  # noqa: E402
+from render_isaac_mission import KIND, ROBUST, font, quat_R, running_value  # noqa: E402
 
 LINK_COL = {"base": "#d4d6d9", "hip": "#2e3033", "thigh": "#c9cbce", "calf": "#26282b", "foot": "#101112"}
 STRAT = {"walkover": ("WALK PAST (no stops)", "#9aa5b1"), "approach": ("STOP & LOOK closely", "#f08c00")}
@@ -334,9 +334,11 @@ def main() -> int:
     ap.add_argument("--fps", type=int, default=24)
     ap.add_argument("--fast", type=float, default=2.5, help="playback speed while nobody is inspecting")
     ap.add_argument("--still", type=float, nargs="*")
+    ap.add_argument("--robot", default="Go2")
     a = ap.parse_args()
     walk = json.loads(resolve_path(a.walk).read_text())
     look = json.loads(resolve_path(a.look).read_text())
+    ROBUST["on"] = bool(look.get("robust_memory"))
     W, H = 1920, 1080
     VW, VH, TOP = 956, 600, 64
     meshes = load_meshes(a.meshes)
@@ -348,7 +350,7 @@ def main() -> int:
     def frame(t, speed, final=False):
         img = Image.new("RGB", (W, H), (20, 24, 28))
         d = ImageDraw.Draw(img)
-        d.text((20, 10), "Go2 sidewalk inspection: walk past vs. stop & look  (Isaac Lab physics, same tile, same "
+        d.text((20, 10), f"{a.robot} sidewalk inspection: walk past vs. stop & look  (Isaac Lab physics, same tile, same "
                          "sensors)", font=F_big, fill=(232, 236, 240))
         prof = walk["profile"] + (" + odometry drift + camera latency" if walk.get("pose_errors") else "")
         d.text((22, 46), f"D555 + D405 depth simulated with {prof} errors  ·  tile {walk['tile']} (test layout)",

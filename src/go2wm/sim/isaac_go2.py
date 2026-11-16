@@ -28,6 +28,12 @@ from .mock import make_scene
 PARK_XY = (1000.0, 1000.0)
 
 
+def torch_full_like(t, v):
+    out = t.clone()
+    out[:] = v
+    return out
+
+
 class IsaacGo2Adapter:
     backend = "isaac"
 
@@ -35,6 +41,8 @@ class IsaacGo2Adapter:
         self.cfg = c = cfg["isaac"]
         self.control_dt = float(c["control_dt"])
         self.robot_radius = float(c["robot_radius"])
+        self.LEG_L2 = float(c.get("leg_l2", self.LEG_L2))  # calf: knee to foot centre / wheel axle (Go2-W 0.2264)
+        self.POSTURE_MIN_FOOT_Y = float(c.get("posture_min_foot_y", self.POSTURE_MIN_FOOT_Y))
         self.scene: SceneSpec | None = None
 
         from isaaclab.app import AppLauncher
@@ -46,6 +54,8 @@ class IsaacGo2Adapter:
         import torch
         import isaaclab.sim as sim_utils
         import isaaclab_tasks  # noqa: F401  (registers tasks)
+        if str(c["task"]).startswith("Go2WM-"):  # Go2-W (wheeled legs), our own task (sim/go2w_task.py)
+            from . import go2w_task  # noqa: F401
         from isaaclab.assets import RigidObjectCfg
         from isaaclab_rl.rsl_rl import RslRlVecEnvWrapper
         from isaaclab_tasks.utils import load_cfg_from_registry, parse_env_cfg
@@ -243,9 +253,171 @@ class IsaacGo2Adapter:
         self.cmd_term.vel_command_b[:] = self.torch.tensor(cmd, device=self.uenv.device, dtype=self.torch.float32)
         self._applied = np.array(cmd, dtype=np.float64)
 
+    # --- inspection posture (crouch + body pitch while standing), joint-level, no retraining -------------
+    LEG_L1, LEG_L2, HIP_Y = 0.213, 0.213, 0.0955  # Go2 thigh / calf length, hip-to-thigh lateral offset [m]
+    HIPS = {"FL": (0.1934, 0.0465, 1), "FR": (0.1934, -0.0465, -1), "RL": (-0.1934, 0.0465, 1),
+            "RR": (-0.1934, -0.0465, -1)}  # hip joint position in the base frame, side (+1 left)
+    POSTURE_MAX_ROLL = 0.15  # rad: abort the posture (stand back up) if the roll changes more than this from its start
+    POSTURE_RATES = {"drop": 0.04, "pitch": 0.18, "roll": 0.18}  # ramp rates [m/s, rad/s]
+    POSTURE_MIN_FOOT_Y = 0.07  # m: refuse to crouch if a foot stands closer than this to the body's centre line
+    POSTURE_KP, POSTURE_KD = 60.0, 3.0  # joint PD gains while posing (stand-mode gains of the real Go2 ~ 60 / 5)
+
+    def set_posture(self, drop: float = 0.0, pitch: float = 0.0) -> None:
+        """Target body drop [m] (below the height at the start of the posture) and ABSOLUTE nose-down body pitch
+        [rad] (0 = level; the walking policy stands ~10 deg nose-up), body roll levelled to 0, while standing.
+        drop > 0: the walking policy is suspended and the legs are driven to the matching joint targets (3-joint IK
+        per leg with every foot kept where it stands), ramped at 0.08 m/s and 0.35 rad/s; drop = 0: ramps back to
+        the start pose and hands control to the policy again. Velocity commands are ignored while a posture is
+        active. If the body rolls past POSTURE_MAX_ROLL the posture is released (counted in posture_aborts)."""
+        self._posture_target = (float(drop), float(pitch))
+
+    def posture_state(self) -> tuple[float, float, bool]:
+        """(drop, commanded absolute pitch, settled at target)."""
+        st = getattr(self, "_posture", None)
+        tgt = getattr(self, "_posture_target", (0.0, 0.0))
+        if st is None:
+            return 0.0, 0.0, tgt[0] <= 0.0
+        g = self._posture_goal(st, tgt)
+        return st["drop"], st["pitch"], all(abs(st[k] - g[k]) < 1e-4 for k in g)
+
+    @staticmethod
+    def _posture_goal(st, tgt):
+        if tgt[0] > 0.0:
+            return {"drop": tgt[0], "pitch": tgt[1], "roll": 0.5 * st["roll0"]}  # level half of the start roll
+        return {"drop": 0.0, "pitch": st["pitch0"], "roll": st["roll0"]}
+
+    def _leg_ik(self, x: float, z: float) -> tuple[float, float]:
+        l1, l2 = self.LEG_L1, self.LEG_L2
+        d2 = x * x + z * z
+        c = -math.acos(max(-1.0, min(1.0, (d2 - l1 * l1 - l2 * l2) / (2 * l1 * l2))))
+        t = math.atan2(-x, -z) - math.atan2(l2 * math.sin(c), l1 + l2 * math.cos(c))
+        return t, c
+
+    def _leg_fk(self, a: float, t: float, c: float, side: int) -> np.ndarray:
+        """Foot relative to the hip joint, base frame (hip about x, thigh and calf about y)."""
+        x = -self.LEG_L1 * math.sin(t) - self.LEG_L2 * math.sin(t + c)
+        z = -self.LEG_L1 * math.cos(t) - self.LEG_L2 * math.cos(t + c)
+        y = side * self.HIP_Y
+        return np.array([x, y * math.cos(a) - z * math.sin(a), y * math.sin(a) + z * math.cos(a)])
+
+    def _leg_ik3(self, p: np.ndarray, side: int) -> tuple[float, float, float]:
+        px, py, pz = (float(v) for v in p)
+        Lz = math.sqrt(max(py * py + pz * pz - self.HIP_Y ** 2, 1e-6))
+        a = math.atan2(pz, py) - math.atan2(-Lz, side * self.HIP_Y)
+        a = (a + math.pi) % (2 * math.pi) - math.pi
+        t, c = self._leg_ik(px, -Lz)
+        return a, t, c
+
+    @staticmethod
+    def _quat_R(q) -> np.ndarray:
+        w, x, y, z = (float(v) for v in q)
+        return np.array([[1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y)],
+                         [2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x)],
+                         [2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)]])
+
+    @staticmethod
+    def _R_pr(p: float, r: float) -> np.ndarray:
+        cp, sp, cr, sr = math.cos(p), math.sin(p), math.cos(r), math.sin(r)
+        Ry = np.array([[cp, 0, sp], [0, 1, 0], [-sp, 0, cp]])
+        Rx = np.array([[1, 0, 0], [0, cr, -sr], [0, sr, cr]])
+        return Ry @ Rx
+
+    def _level_R(self) -> np.ndarray:
+        R = self._quat_R(self.robot.data.root_quat_w[0])
+        yaw = math.atan2(R[1, 0], R[0, 0])
+        c, s = math.cos(-yaw), math.sin(-yaw)
+        return np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]]) @ R  # attitude with the heading removed
+
+    def _posture_step(self) -> bool:
+        """One policy-rate step of the posture controller; False when the walking policy should run."""
+        tgt = getattr(self, "_posture_target", (0.0, 0.0))
+        st = getattr(self, "_posture", None)
+        if st is None:
+            if tgt[0] <= 0.0:
+                return False
+            names = list(self.robot.joint_names)
+            q0 = self.robot.data.joint_pos[0].detach().clone()
+            Rl = self._level_R()
+            p0, r0 = math.asin(max(-1.0, min(1.0, -Rl[2, 0]))), math.atan2(Rl[2, 1], Rl[2, 2])
+            legs = {}
+            for leg, (hx, hy, side) in self.HIPS.items():
+                ii = [names.index(f"{leg}_{j}_joint") for j in ("hip", "thigh", "calf")]
+                hip = np.array([hx, hy, 0.0])
+                foot_b = hip + self._leg_fk(*(float(q0[i]) for i in ii), side)
+                legs[leg] = (ii, side, hip, Rl @ foot_b)  # foot rel. base centre, level heading frame
+            if min(v[1] * v[3][1] for v in legs.values()) < self.POSTURE_MIN_FOOT_Y:  # a foot under the body
+                self._posture_target = (0.0, 0.0)
+                self.posture_aborts = getattr(self, "posture_aborts", 0) + 1
+                self.posture_skipped = getattr(self, "posture_skipped", 0) + 1
+                return False
+            self._set_gains(True)
+            st = self._posture = {"ir": 0.0, "ip": 0.0, "drop": 0.0, "pitch": p0, "roll": r0, "pitch0": p0, "roll0": r0, "q0": q0,
+                                  "legs": legs, "term": self.uenv.action_manager._terms["joint_pos"],
+                                  "fix": self._R_pr(p0, r0).T @ Rl}
+        dt = self.step_dt
+        Rm = self._level_R()
+        roll_m, pitch_m = math.atan2(Rm[2, 1], Rm[2, 2]), math.asin(max(-1.0, min(1.0, -Rm[2, 0])))
+        if tgt[0] > 0.0 and abs(roll_m - st["roll0"]) > self.POSTURE_MAX_ROLL:  # safety: stand up if it starts to tip
+            self._posture_target = tgt = (0.0, 0.0)
+            self.posture_aborts = getattr(self, "posture_aborts", 0) + 1
+        goal = self._posture_goal(st, tgt)
+        for k, rate in self.POSTURE_RATES.items():
+            st[k] += float(np.clip(goal[k] - st[k], -rate * dt, rate * dt))
+        # attitude feedback (PI on roll / pitch): the joint PD sags under load, so command past the target
+        er, ep = roll_m - st["roll"], pitch_m - st["pitch"]
+        st["ir"] = float(np.clip(st["ir"] + er * dt, -0.15, 0.15))
+        st["ip"] = float(np.clip(st["ip"] + ep * dt, -0.15, 0.15))
+        r_cmd = st["roll"] - 0.3 * er - 1.0 * st["ir"]
+        p_cmd = st["pitch"] - 0.2 * ep - 0.8 * st["ip"]
+        Rt = self._R_pr(p_cmd, r_cmd) @ st["fix"]  # = the start attitude exactly at the start
+        q = st["q0"].clone()
+        for leg, (ii, side, hip, foot_l) in st["legs"].items():
+            foot_b = Rt.T @ (foot_l - np.array([0.0, 0.0, -st["drop"]]))  # feet stay put, base drops and turns
+            a, t, c = self._leg_ik3(foot_b - hip, side)
+            q[ii[0]], q[ii[1]], q[ii[2]] = a, t, c
+        term = st["term"]
+        jid = term._joint_ids
+        q_term = q if isinstance(jid, slice) else q[jid]  # the joints of the joint_pos action term
+        legs = ((q_term - term._offset[0]) / term._scale).reshape(-1)  # joint_pos action: q = offset + scale * a
+        self.wrapped.step(self._full_action(term, legs))
+        self._env_steps += 1
+        if tgt[0] <= 0.0 and all(abs(st[k] - goal[k]) < 1e-6 for k in goal):
+            self._posture = None  # back at the start pose: the walking policy takes over next step
+            self._set_gains(False)
+        return True
+
+    def _full_action(self, term, leg_action):
+        """Action vector for all action terms: the leg joint-position term from the posture controller, zeros for
+        the others (Go2-W: wheel velocity 0 = wheels held still). leg_action is in the term's joint order."""
+        am = self.uenv.action_manager
+        la = leg_action
+        parts = []
+        for name in am.active_terms:
+            t_ = am._terms[name]
+            parts.append(la if t_ is term else self.torch.zeros(t_.action_dim, device=la.device))
+        return self.torch.cat(parts).unsqueeze(0)
+
+    def _set_gains(self, posing: bool) -> None:
+        """Stiffer joint PD while holding a posture; the walking policy's own gains otherwise."""
+        from isaaclab.actuators import ImplicitActuator
+
+        if not hasattr(self, "_gains0"):
+            self._gains0 = {k: (a.stiffness.clone(), a.damping.clone()) for k, a in self.robot.actuators.items()}
+        for k, act in self.robot.actuators.items():
+            kp0, kd0 = self._gains0[k]
+            kp = torch_full_like(kp0, self.POSTURE_KP) if posing else kp0
+            kd = torch_full_like(kd0, self.POSTURE_KD) if posing else kd0
+            act.stiffness[:] = kp
+            act.damping[:] = kd
+            if isinstance(act, ImplicitActuator):
+                self.robot.write_joint_stiffness_to_sim(kp, joint_ids=act.joint_indices)
+                self.robot.write_joint_damping_to_sim(kd, joint_ids=act.joint_indices)
+
     def _policy_step(self) -> None:
         # caller holds torch.inference_mode() (as Isaac Lab's play.py): env buffers become
         # inference tensors, so *all* env interaction (reset included) must stay in that mode.
+        if self._posture_step():
+            return
         obs = self.wrapped.get_observations()  # recompute: includes the current command
         actions = self.policy(obs)
         self.wrapped.step(actions)
@@ -270,6 +442,23 @@ class IsaacGo2Adapter:
                 x, y = PARK_XY[0] + 3 * i, PARK_XY[1]
             pose = torch.tensor([[x, y, z, 1, 0, 0, 0]], device=self.uenv.device, dtype=torch.float32)
             obj.write_root_pose_to_sim(pose)
+        self._n_static = len(obs_arr)
+
+    def set_movers(self, xy) -> None:
+        """Move kinematic cylinders (people in demo missions) to scene xy, in the slots after the static obstacles."""
+        from .terrain import sidewalk_height
+
+        torch = self.torch
+        origin = self._origin()
+        with torch.inference_mode():
+            for j, (x, y) in enumerate(np.asarray(xy).reshape(-1, 2)):
+                i = self._n_static + j
+                if i >= self.n_slots:
+                    break
+                z = self.cfg["obstacle_height"] / 2 + (float(sidewalk_height(x, y, self.terrain)) if self.terrain else 0.0)
+                pose = torch.tensor([[x + origin[0], y + origin[1], z, 1, 0, 0, 0]], device=self.uenv.device,
+                                    dtype=torch.float32)
+                self.uenv.scene[f"obstacle_{i}"].write_root_pose_to_sim(pose)
 
     # --- SimulatorAdapter ------------------------------------------------
     def reset(self, seed: int, scene_id: str | None = None) -> Observation:
@@ -307,6 +496,9 @@ class IsaacGo2Adapter:
                 self.scene = sidewalk_mission_scene(self.terrain, scene_id,
                                                     fixed_radius=float(self.cfg["obstacle_radius"]))
                 self.scene.params.update(keep)
+        if hasattr(self, "_gains0"):
+            self._set_gains(False)
+        self._posture, self._posture_target = None, (0.0, 0.0)
         torch.manual_seed(seed)
         self._rig_rng = np.random.default_rng(seed + 7_000_000)  # sensor noise / LiDAR directions per episode
         self.wrapped.reset()

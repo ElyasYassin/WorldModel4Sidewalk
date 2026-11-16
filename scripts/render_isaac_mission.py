@@ -41,14 +41,24 @@ def quat_R(q):
                      [2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)]])
 
 
+ROBUST = {"on": False}  # set from the mission file (robust_memory) by the renderers
+
+
 def running_value(f, t):
-    """The memory's estimate at time t (same rule as SpatialMemory._update: mean of the best-confidence class)."""
+    """The memory's estimate at time t (same rule as SpatialMemory._update: mean of the best-confidence class, or
+    the outlier-rejecting median when the mission ran with robust_memory)."""
     meas = [o for o in f.get("observations", []) if o["t"] <= t and o.get("value_m") is not None]
     if not meas:
         return None, None
     c = max(o["confidence"] for o in meas)
-    top = [o for o in meas if o["confidence"] >= c - 1e-9]
-    return float(np.mean([o["value_m"] for o in top])), max(meas, key=lambda o: o["confidence"])["sensor"]
+    top = np.array([o["value_m"] for o in meas if o["confidence"] >= c - 1e-9])
+    sensor = max(meas, key=lambda o: o["confidence"])["sensor"]
+    if ROBUST["on"] and len(top) >= 3:
+        med = float(np.median(top))
+        mad = float(np.median(np.abs(top - med)))
+        keep = top[np.abs(top - med) <= max(3.0 * 1.4826 * mad, 0.004)]
+        return float(np.median(keep if len(keep) else top)), sensor
+    return float(np.mean(top)), sensor
 
 
 def font(size, bold=False):

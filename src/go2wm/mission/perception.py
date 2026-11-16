@@ -80,17 +80,97 @@ def to_robot(pose, X, Y):
     return c * dx + s * dy, -s * dx + c * dy
 
 
+def curb_mask(elev: np.ndarray, X: np.ndarray, walk: np.ndarray, drop: float = 0.08, min_len: float = 0.8,
+              pad: int = 4) -> np.ndarray:
+    """Cells at or next to a curb, found in the frame itself (not from the map + pose estimate, which fails once
+    the lateral pose error exceeds the walkway margin): cells more than `drop` below the walkway's median height
+    that form a strip at least `min_len` long along the walk (world x), dilated by `pad` cells. A hole, even a deep
+    one, is compact and is kept."""
+    fin = np.isfinite(elev)
+    if not (walk & fin).any():
+        return np.zeros_like(fin)
+    low = fin & (elev < np.nanmedian(elev[walk & fin]) - drop)
+    strip = np.zeros_like(fin)
+    for comp in _clusters(low):
+        if np.ptp(X[comp[:, 0], comp[:, 1]]) >= min_len:
+            strip[comp[:, 0], comp[:, 1]] = True
+    if not strip.any():
+        return strip
+    out = strip.copy()
+    for _ in range(pad):  # 4-neighbour dilation
+        g = out.copy()
+        g[1:] |= out[:-1]; g[:-1] |= out[1:]; g[:, 1:] |= out[:, :-1]; g[:, :-1] |= out[:, 1:]
+        out = g
+    return out
+
+
+def curb_lateral(elev: np.ndarray, drop: float = 0.08, min_len: float = 0.8, min_rows: int = 8,
+                 with_angle: bool = False):
+    """Robot-frame lateral position [m] of a curb edge running along the robot's heading, or None. Per grid row
+    (forward distance) the curb is the first cell, going outward from the robot, more than `drop` below the
+    walkway median; the edge is the median over rows of the midpoint between that cell and the last walkway cell.
+    Only rows 0.5-2 m ahead (dense, low noise) are used, and only one side (the side with more rows) is returned.
+    with_angle: returns (offset at the robot, angle of the curb line in the robot frame [rad]) from a line fit
+    (Theil-Sen: median of pairwise slopes), or None."""
+    res, fin = ELEV_GRID["res"], np.isfinite(elev)
+    rows = (CX > 0.5) & (CX < 2.0)
+    if not fin[rows].any():
+        return None
+    ref = np.nanmedian(elev[rows][:, np.abs(CY) < 0.4]) if fin[rows][:, np.abs(CY) < 0.4].any() else None
+    if ref is None:
+        return None
+    best = []
+    for side in (-1, 1):
+        cols = np.nonzero(side * CY > 0.15)[0]
+        cols = cols[np.argsort(np.abs(CY[cols]))]  # outward from the robot
+        edges = []
+        for i in np.nonzero(rows)[0]:
+            e = elev[i, cols]
+            f = np.nonzero(np.isfinite(e))[0]  # finite cells, outward (shadows and dropouts are skipped)
+            if len(f) < 2:
+                continue
+            ef = e[f]
+            low = np.nonzero(ef < ref - drop)[0]
+            if len(low) == 0 or low[0] == 0:
+                continue
+            # last walkway cell before the drop, then the first cell clearly below it (often a mixed pixel)
+            w = np.nonzero(ef[: low[0]] > ref - 0.03)[0]
+            if len(w) == 0:
+                continue
+            k = w[-1] + 1
+            if f[k] - f[w[-1]] > 3:  # too large a gap to place the edge
+                continue
+            edges.append((CX[i], 0.5 * (CY[cols[f[w[-1]]]] + CY[cols[f[k]]])))
+        if len(edges) >= min_rows and np.ptp(CX[rows]) >= min_len and len(edges) > len(best):
+            best = edges
+    if not best:
+        return None
+    if not with_angle:
+        return float(np.median([b[1] for b in best]))
+    xe, ye = np.array(best).T
+    i, j = np.triu_indices(len(xe), 1)
+    ok = np.abs(xe[j] - xe[i]) > 0.5
+    if ok.sum() < 5:
+        return None
+    k = float(np.median((ye[j] - ye[i])[ok] / (xe[j] - xe[i])[ok]))
+    return float(np.median(ye - k * xe)), float(np.arctan(k))
+
+
 def detect_candidates(elev: np.ndarray, count: np.ndarray, pose: np.ndarray, t: float, walk_half: float,
                       thresh: float = 0.012, thresh_per_m: float = 0.008, max_range: float = 2.5, min_cells: int = 3,
-                      sensor: str = "depth_d555", edge_min_span: float = 0.6) -> list[Observation]:
+                      sensor: str = "depth_d555", edge_min_span: float = 0.6,
+                      curb_drop: float = 0.0) -> list[Observation]:
     """Clusters of cells deviating from the local median. The threshold grows with range beyond 1 m (noise grows
     with depth). A step produces a raised cluster on its high side and a depressed one on its low side, and a hole
-    a raised far rim: touching clusters of opposite sign are merged into the dominant one (peak x cells)."""
+    a raised far rim: touching clusters of opposite sign are merged into the dominant one (peak x cells).
+    `curb_drop` > 0 also drops cells at or next to a curb found in the frame itself (`curb_mask`)."""
     res = elev - _median_filter(elev)
     X, Y = to_world(pose, CX[:, None], CY[None, :])
     xr_grid = np.broadcast_to(CX[:, None], res.shape)
     thr = thresh + thresh_per_m * np.maximum(0.0, xr_grid - 1.0)
     ok = np.isfinite(res) & (np.abs(Y) < walk_half - 0.12) & (xr_grid > 0.3) & (xr_grid < max_range)
+    if curb_drop > 0:
+        ok &= ~curb_mask(elev, X, ok, curb_drop)
     comps = []
     for sign, kind in ((-1, "depression"), (1, "edge")):
         for comp in _clusters(ok & (sign * res > thr)):
@@ -282,9 +362,11 @@ def measure(points_b: np.ndarray, pose: np.ndarray, target_xy: np.ndarray, kind:
     return None
 
 
-def in_view(sensor: str, pose: np.ndarray, xy: np.ndarray) -> bool:
-    """Is a world point well inside the sensor's measurement zone (robot frame)?"""
+def in_view(sensor: str, pose: np.ndarray, xy: np.ndarray, d405_zone=None) -> bool:
+    """Is a world point well inside the sensor's measurement zone (robot frame)? `d405_zone` = (x_lo, x_hi, half
+    width) overrides the D405 zone (inspection posture: the camera looks closer and steeper)."""
     xr, yr = to_robot(pose, *xy)
     if sensor == "depth_d405":
-        return 0.42 <= xr <= 0.62 and abs(yr) <= 0.2
+        lo, hi, hw = d405_zone or (0.42, 0.62, 0.2)
+        return lo <= xr <= hi and abs(yr) <= hw
     return 0.6 <= xr <= 1.2 and abs(yr) <= 0.6  # D555 measuring zone (detection reaches farther)

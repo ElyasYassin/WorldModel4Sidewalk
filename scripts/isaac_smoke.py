@@ -32,14 +32,32 @@ SCHEDULE = [  # (vx, vy, yaw_rate, seconds)
     (0.3, 0.0, 0.8, 3.0),
     (0.0, 0.0, 0.0, 2.0),
 ]
+DEADZONE = [  # small commands (E1 found the Go2 rough policy ignores planar commands below ~0.3 m/s)
+    (0.0, 0.0, 0.0, 1.0),
+    (0.1, 0.0, 0.0, 3.0),
+    (0.2, 0.0, 0.0, 3.0),
+    (0.3, 0.0, 0.0, 3.0),
+    (0.4, 0.0, 0.0, 3.0),
+    (0.0, 0.0, 0.2, 3.0),
+    (0.0, 0.0, 0.4, 3.0),
+    (0.0, 0.0, 0.6, 3.0),
+    (0.0, 0.1, 0.0, 3.0),
+    (0.0, 0.2, 0.0, 3.0),
+    (0.0, 0.0, 0.0, 2.0),
+]
 
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="configs/isaac_go2.yaml")
     ap.add_argument("--out", default="outputs/isaac_smoke/report.json")
+    ap.add_argument("--checkpoint", default=None)
+    ap.add_argument("--schedule", choices=["default", "deadzone", "both"], default="default")
     args = ap.parse_args(argv)
     cfg = load_config(args.config)
+    if args.checkpoint:
+        cfg["isaac"]["policy_checkpoint"] = args.checkpoint
+    sched = {"default": SCHEDULE, "deadzone": DEADZONE, "both": SCHEDULE + DEADZONE[1:]}[args.schedule]
     t_launch = time.perf_counter()
     from go2wm.sim.isaac_go2 import IsaacGo2Adapter
 
@@ -52,7 +70,7 @@ def main(argv=None) -> int:
         fell = False
         t_sim0 = time.perf_counter()
         steps = 0
-        for vx, vy, wz, dur in SCHEDULE:
+        for vx, vy, wz, dur in sched:
             n = int(round(dur / sim.control_dt))
             real = []
             for k in range(n):

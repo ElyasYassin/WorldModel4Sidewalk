@@ -1067,3 +1067,52 @@ Medians were 1-2 mm, but the tails are not small: p90 6-25 mm. Systematic failur
 - Pessimistic sensors + pose errors: walk past upheaval median 5.7 mm, p90 27.5 mm; stop & look median 0.6 mm,
   p90 25 mm; false findings 0.67 per mission (approach, was 0.29 without pose errors in realistic).
 - ADA class agreement 90-100 % is weak evidence: the test tiles have no upheaval under 10 mm or hole under 20 mm.
+
+## Phase 1, step 7: demo mission, body posture, people, Isaac Sim RTX rendering (2026-11-12/13)
+
+### Demo street and mission context (`mission/site.py`)
+`demo_tile()`: 56 m street with 5 blocks and 10 defects. The defects include near-threshold ones: an 11 mm upheaval, a 45 mm hole and a 110 mm hole.
+- **Work zone:** block 3, with barriers, cones, two workers, a pile and a generator. Static site objects are planner obstacles.
+- **People:** a worker pacing inside the zone, a pedestrian crossing from a doorway to the road (triggered by the robot), and an oncoming pedestrian who steps aside.
+
+The runner yields (stops) while a person is in the corridor ahead and caps speed at 0.45 m/s near people. People are known from ground truth, standing in for a person detector; the depth simulation ray-casts only the sidewalk surface. Isaac moves kinematic cylinders for them (`IsaacGo2Adapter.set_movers`).
+
+### Inspection posture (crouch + body attitude), joint level, no retraining
+`IsaacGo2Adapter.set_posture(drop, pitch)`: the walking policy is suspended and every leg is driven by 3-joint IK with the feet kept where they stand.
+- **Leg model:** forward kinematics matches the simulated foot positions to 0.0 mm.
+- **Stiffer joints while posing:** joint gains rise to 60 / 3, close to the real Go2's stand gains of about 60 / 5.
+- **Attitude feedback:** roll / pitch PI compensates joint sag.
+- **Stance check:** refuses to crouch when a foot stands within 7 cm of the body centre line; the runner then falls back to a standing close-up.
+- **Roll abort:** stands back up on a roll change above 8.6 deg.
+
+The first versions fell twice in missions:
+- sagittal-only IK slid the body sideways over a skewed stance;
+- soft joints let one side buckle under load.
+
+Both are fixed by the full 3D IK and the gains and attitude feedback above. The final gentle pose (5 cm crouch, body level) puts the D405 at 31 cm from the ground at 60 deg, against 53 cm at 48 deg standing. Note that the Go2 rough policy stands about 11 deg nose-up, so the standing D405 looks about 0.68 m ahead, not the 0.52 m the stand-off assumed.
+
+Demo mission results (realistic sensors + drift + latency):
+
+| run | outcome | inspections | notes |
+|---|---|---|---|
+| stop & look, standing | goal 102 s | 6, 1 yield | 45 mm upheaval 45.3, 110 mm hole 110.2, 28 mm upheaval read 83 mm: one 634 mm D405 outlier wrecked the mean of the best-confidence readings (open issue: no outlier rejection) |
+| walk past | goal 86 s | 0 | 28 mm upheaval read 19 mm |
+| stop & look + posture | goal 119 s | 1 crouch done, 2 refused by the stance check | the crouched reading of the 28 mm upheaval: 28.0 mm. Other values worse this run (45 mm upheaval 4.6 mm): Isaac run-to-run variance is large, so this is not evidence that posture helps |
+
+Curb false positives: where the work zone squeezes the robot next to the 15 cm curb, the curb edge is logged as 4 "holes".
+
+### Isaac Sim RTX rendering
+- **Renderer:** Isaac Sim 5.1's RTX renderer still crashes at start-up on driver 610.88 (in `rtx.scenedb`, before project code). The standalone Isaac Sim 6.0.1 renders on the same driver.
+- **Replay script:** `scripts/isaac_rtx_replay.py` (6.0.1) rebuilds the street in USD:
+  - the sidewalk height field from the physics terrain, with its concrete albedo;
+  - MDL asphalt and grass, and buildings;
+  - NVIDIA trees and shrubs, puddles in MDL water, work-zone props;
+  - an HDR sky and a sun;
+  - NVIDIA's Go2 USD posed from the recorded link poses.
+- **Video composition:** `render_demo_mission.py --timeline-out` exports the camera path; `--view-dir` composes the HUD around the RTX frames, with labels, trail and sensor zones projected into the image.
+- **People:** the NVIDIA characters use the `RL_BoneRoot` skeleton, while the stock `skelanim` clips use another one (`Root/...`), so the clips never bind; the first render showed T-posed, floating, sliding people. The characters are now animated procedurally on their own skeleton:
+  - a walk cycle phased by the distance walked, so there is no foot sliding;
+  - arms lowered from the T-pose;
+  - idle, look-around and digging poses;
+  - unscaled, feet on the ground.
+- Video: `outputs/videos/17_demo_mission_isaac_rtx.mp4`.

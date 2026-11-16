@@ -1,0 +1,13 @@
+# Isaac Unitree Go2-W (wheeled legs) on the parametric sidewalk terrain.
+# Task Go2WM-Velocity-Rough-Go2W-v0 (src/go2wm/sim/go2w_task.py: Isaac Lab's Go2 rough task + the Go2-W URDF from
+# the robot_lab repository, used as data): height-scan policy input, 12 leg joint-position actions + 4 wheel velocity
+# actions. No published checkpoint exists: the policy is trained by us (scripts/train_go2w.py, rsl_rl PPO).
+_base_: isaac_go2.yaml
+isaac:
+  task: Go2WM-Velocity-Rough-Go2W-v0
+  train_task: Go2WM-Velocity-Rough-Go2W-v0
+  policy_checkpoint: D:/go2wm/ext/go2w_runs/rough/model_latest.pt
+  leg_l2: 0.2264          # calf length to the wheel axle (URDF FL_foot_joint origin)
+  posture_min_foot_y: 0.05  # wheels stand 7-14 cm off the centre line (narrower than the Go2's feet)
+  terrain:
+    friction: 1.0

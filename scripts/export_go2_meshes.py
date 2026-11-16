@@ -22,10 +22,13 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="configs/isaac_go2_rough.yaml")
     ap.add_argument("--out", default="outputs/go2_meshes.npz")
+    ap.add_argument("--checkpoint", default=None, help="override policy_checkpoint (any compatible model)")
     a = ap.parse_args(argv)
     cfg = copy.deepcopy(load_config(a.config))
     cfg["isaac"].update(families=["sidewalk"], sensor_rig=[], rgb_camera=False, terrain_texture=None,
                         record_height_scan=False, enable_cameras=False)
+    if a.checkpoint:
+        cfg["isaac"]["policy_checkpoint"] = a.checkpoint
     from go2wm.sim.isaac_go2 import IsaacGo2Adapter
 
     sim = IsaacGo2Adapter(cfg)

@@ -35,12 +35,28 @@ def main(argv=None) -> int:
     ap.add_argument("--max-steps", type=int, default=900)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="outputs/isaac_missions")
+    ap.add_argument("--posture", type=float, nargs=2, default=None, metavar=("DROP", "PITCH"),
+                    help="approach: crouch [m] + absolute nose-down pitch [rad] for the D405 close-up, e.g. 0.08 0.17")
+    ap.add_argument("--tag", default="", help="suffix for the output file names")
+    ap.add_argument("--checkpoint", default=None, help="override the config's policy_checkpoint")
+    ap.add_argument("--robust", action="store_true", help="robust (median, outlier-rejecting) finding estimates")
+    ap.add_argument("--curb-aware", action="store_true", help="ignore the curb found in each depth frame and correct "
+                    "the lateral pose estimate against it")
+    ap.add_argument("--dyn-d405", action="store_true", help="D405 zone / stand-off from the actual camera geometry")
+    ap.add_argument("--obstacle-slots", type=int, default=None, help="kinematic cylinders (site objects + people)")
+    ap.add_argument("--obstacle-radius", type=float, default=None)
     a = ap.parse_args(argv)
     tile = json.loads(resolve_path(a.tiles).read_text())[a.tile]
     cfg = copy.deepcopy(load_config(a.config))
     cfg["isaac"].update(families=["sidewalk"], terrain_tiles=[tile], mission_scene=True, scene_obstacles=True,
                         sensor_rig=[], rgb_camera=False, terrain_texture=None, record_height_scan=False,
                         enable_cameras=False)
+    if a.checkpoint:
+        cfg["isaac"]["policy_checkpoint"] = a.checkpoint
+    if a.obstacle_slots is not None:
+        cfg["isaac"]["obstacle_slots"] = a.obstacle_slots
+    if a.obstacle_radius is not None:
+        cfg["isaac"]["obstacle_radius"] = a.obstacle_radius
     pc = load_config(a.planner)
     out = resolve_path(a.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -68,11 +84,13 @@ def main(argv=None) -> int:
             safety = SafetyFilter({**pc["safety"], "limits": pc["limits"], "robot_radius": pc["robot_radius"]})
             ctrl = MPCController(ModelPredictor(KinematicBaseline(1, "command"), pc["mpc"].get("device", "cpu")),
                                  pc, safety, a.seed, "kinematic_mpc")
-            res = run_mission(sim, ctrl, tile, Policy(pol, reach=a.reach, align=True, budget_steps=150, avoid_holes=True), a.profile, seed=a.seed + a.tile, max_steps=a.max_steps,
-                              nav_cfg=pc["navigation"], pose_errors=a.pose_errors, on_step=rec, log=lambda *x: None)
+            res = run_mission(sim, ctrl, tile, Policy(pol, reach=a.reach, align=True, budget_steps=150, avoid_holes=True,
+                                                     posture=tuple(a.posture) if a.posture else None, dyn_d405=a.dyn_d405), a.profile, seed=a.seed + a.tile, max_steps=a.max_steps,
+                              nav_cfg=pc["navigation"], pose_errors=a.pose_errors, on_step=rec, robust_memory=a.robust, curb_aware=a.curb_aware, log=lambda *x: None)
             res["score"] = score_mission(res, tile)
-            res.update(tile=a.tile, tiles_file=a.tiles, backend="isaac_rough_policy", body_names=names, links=links)
-            f = out / f"{pol}_tile{a.tile}.json"
+            res.update(tile=a.tile, tiles_file=a.tiles, posture=a.posture, config=a.config,
+                       checkpoint=cfg["isaac"].get("policy_checkpoint"), robot=sim.cfg.get("task"), backend="isaac_rough_policy", body_names=names, links=links)
+            f = out / f"{pol}{a.tag}_tile{a.tile}.json"
             f.write_text(json.dumps(res, default=float))
             sc = res["score"]
             print(f"[isaac-mission] {pol} tile {a.tile}: {res['outcome']} in {res['time_s']:.1f} s; " + "; ".join(

@@ -23,8 +23,11 @@ from .perception import Observation
 
 class SpatialMemory:
     def __init__(self, walk_bounds: tuple[float, float, float, float], route_x: list[float],
-                 assoc_radius: float = 0.35, cell: float = 0.10):
+                 assoc_radius: float = 0.35, cell: float = 0.10, robust: bool = False):
         self.bounds, self.route_x, self.assoc, self.cell = walk_bounds, list(route_x), assoc_radius, cell
+        # robust=True: a finding's value is the median of the best-sensor readings after dropping outliers
+        # (> 3 MAD, min 4 mm, from the median) instead of their mean. Off by default (frozen evaluations).
+        self.robust = robust
         x0, x1, y0, y1 = walk_bounds
         self.nx, self.ny = int(np.ceil((x1 - x0) / cell)), int(np.ceil((y1 - y0) / cell))
         self.seen: dict[str, np.ndarray] = {}
@@ -161,7 +164,14 @@ class SpatialMemory:
         vals = np.array([o["value_m"] for o in meas])
         best_conf = float(mw.max())
         top = vals[mw >= best_conf - 1e-9]
-        f["value_m"] = float(np.average(top))  # trust the best sensor class present
+        if self.robust and len(top) >= 3:
+            med = float(np.median(top))
+            mad = float(np.median(np.abs(top - med)))
+            keep = top[np.abs(top - med) <= max(3.0 * 1.4826 * mad, 0.004)]
+            top = keep if len(keep) else top
+            f["value_m"] = float(np.median(top))
+        else:
+            f["value_m"] = float(np.average(top))  # trust the best sensor class present
         f["value_spread_m"] = float(np.std(top)) if len(top) > 1 else 0.0
         ext = [o["extent_m"] for o in meas if o.get("extent_m")]
         f["extent_m"] = float(np.median(ext)) if ext else None

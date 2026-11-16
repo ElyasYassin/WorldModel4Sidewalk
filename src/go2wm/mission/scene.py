@@ -17,6 +17,7 @@ import numpy as np
 from ..sim.base import SceneSpec
 from ..sim.defects import obstacles_from_defects
 from ..sim.terrain import params_with_defaults
+from .site import static_obstacles
 
 
 def sidewalk_mission_scene(terrain: dict[str, Any], scene_id: str = "mission_0000", n_waypoints: int = 5,
@@ -29,6 +30,10 @@ def sidewalk_mission_scene(terrain: dict[str, Any], scene_id: str = "mission_000
     obs = obs[np.abs(obs[:, 1]) - obs[:, 2] < half + edge_margin] if len(obs) else obs  # only those reaching the walk
     if fixed_radius is not None and len(obs):  # the simulator spawns one cylinder size; plan with what is there
         obs[:, 2] = fixed_radius
+    site = static_obstacles(p.get("site"))  # work-zone barriers, cones, workers: planned with their true size
+    site = site[np.abs(site[:, 1]) - site[:, 2] < half + edge_margin] if len(site) else site
+    obs = np.vstack([obs.reshape(-1, 3), site])
+    n_waypoints = int(p.get("n_waypoints", n_waypoints))
     route = np.stack([np.linspace(start[0], goal[0], n_waypoints + 1)[1:], np.zeros(n_waypoints)], 1)
     return SceneSpec(scene_id=scene_id, family="sidewalk_mission",
                      bounds=(-L / 2 + 0.5, L / 2 - 0.5, -half - edge_margin, half + edge_margin),
