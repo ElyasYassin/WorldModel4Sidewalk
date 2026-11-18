@@ -159,13 +159,15 @@ def curb_lateral(elev: np.ndarray, drop: float = 0.08, min_len: float = 0.8, min
 def detect_candidates(elev: np.ndarray, count: np.ndarray, pose: np.ndarray, t: float, walk_half: float,
                       thresh: float = 0.012, thresh_per_m: float = 0.008, max_range: float = 2.5, min_cells: int = 3,
                       sensor: str = "depth_d555", edge_min_span: float = 0.6,
-                      curb_drop: float = 0.0, step_thresh: float = 0.0, step_range: tuple[float, float] = (0.5, 1.8)
-                      ) -> list[Observation]:
+                      curb_drop: float = 0.0, step_thresh: float = 0.0, step_range: tuple[float, float] = (0.5, 1.8),
+                      step_max: float = float("inf"), step_clear: float = 0.3) -> list[Observation]:
     """Clusters of cells deviating from the local median. The threshold grows with range beyond 1 m (noise grows
     with depth). A step produces a raised cluster on its high side and a depressed one on its low side, and a hole
     a raised far rim: touching clusters of opposite sign are merged into the dominant one (peak x cells).
     `curb_drop` > 0 also drops cells at or next to a curb found in the frame itself (`curb_mask`).
-    `step_thresh` > 0 adds the transverse step detector (`transverse_steps`) for faults below `thresh`."""
+    `step_thresh` > 0 adds the transverse step detector (`transverse_steps`) for faults below `thresh`; `step_max`
+    drops its steps above that size (large faults are found by the residual path, and a step down seen from its high
+    side casts an occlusion shadow that the step detector places at the shadow's far end, i.e. at the wrong x)."""
     res = elev - _median_filter(elev)
     X, Y = to_world(pose, CX[:, None], CY[None, :])
     xr_grid = np.broadcast_to(CX[:, None], res.shape)
@@ -220,9 +222,11 @@ def detect_candidates(elev: np.ndarray, count: np.ndarray, pose: np.ndarray, t: 
             for c in g:
                 merged.append({**c, "kind": "depression"} if c["kind"] == "edge" else c)
     if step_thresh > 0:  # small transverse faults the local-median residual cannot reach (it keeps a clean edge)
-        known = [float(CX[c["idx"][:, 0]].mean()) for c in merged if c["kind"] == "edge"]
+        # only where the residual path saw nothing in this frame: next to a large fault the occluded low side shows
+        # up as residual clusters (edge or depression) and the step detector would place the fault at the wrong x
+        known = [float(CX[c["idx"][:, 0]].mean()) for c in merged]
         for st in transverse_steps(elev, ok, step_thresh, step_range, edge_min_span):
-            if all(abs(st["xr"] - k) > 0.3 for k in known):
+            if st["step"] <= step_max and all(abs(st["xr"] - k) > step_clear for k in known):
                 merged.append({"kind": "edge", "idx": st["idx"], "peak": st["step"], "via": "step"})
     out = []
     for c in merged:

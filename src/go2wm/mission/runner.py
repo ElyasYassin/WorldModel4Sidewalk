@@ -152,7 +152,7 @@ class Policy:
 def run_mission(sim, controller, terrain: dict[str, Any], policy: Policy, profile: str = "realistic",
                 seed: int = 0, max_steps: int = 900, nav_cfg: dict[str, Any] | None = None,
                 detect_every: int = 1, log=print, pose_errors: bool = False, on_step=None,
-                robust_memory: bool = False, curb_aware: bool = False, curb_gain: float = 0.3, step_thresh: float = 0.0,
+                robust_memory: bool = False, curb_aware: bool = False, curb_gain: float = 0.3, step_thresh: float = 0.0, step_max: float = float("inf"), step_clear: float = 0.3,
                 curb_gain_yaw: float = 0.05) -> dict[str, Any]:
     """curb_aware: (1) detection ignores cells at a curb found in the depth frame itself, instead of trusting the
     map walkway edge under the drifting pose estimate; (2) with pose errors, the lateral estimate is pulled toward the
@@ -248,7 +248,8 @@ def run_mission(sim, controller, terrain: dict[str, Any], policy: Policy, profil
                         perr.correct(curb_gain * corr, curb_gain_yaw * dyaw)
                         n_curb_fix += 1
             for ob in detect_candidates(e, c, pose, t_s, half, curb_drop=0.08 if curb_aware else 0.0,
-                                        step_thresh=step_thresh):
+                                        step_thresh=step_thresh, step_max=step_max,
+                                        step_clear=step_clear):
                 mem.add(ob)
             ground = float(obs.pos_w[2] - sidewalk_height(obs.pos_w[0], obs.pos_w[1], p))  # height above ground (legs)
             for ob in detect_dropouts(c, expected_hits("depth_d555", R, ground), pose, t_s, half):
@@ -418,7 +419,7 @@ def run_mission(sim, controller, terrain: dict[str, Any], policy: Policy, profil
     return {"outcome": outcome, "time_s": t_s, "steps": len(traj), "policy": policy.name, "profile": profile,
             "path_m": float(np.linalg.norm(np.diff(traj[:, :2], axis=0), axis=1).sum()) if len(traj) > 1 else 0.0,
             "trajectory": traj.tolist(), "pose_estimate": est if perr is not None else None,
-            "pose_errors": perr is not None, "robust_memory": robust_memory, "curb_aware": curb_aware, "curb_fixes": n_curb_fix, "step_thresh": step_thresh, "events": events, "site_track": site_track, "posture_log": posture_log, "posture_aborts": getattr(sim, "posture_aborts", 0),
+            "pose_errors": perr is not None, "robust_memory": robust_memory, "curb_aware": curb_aware, "curb_fixes": n_curb_fix, "step_thresh": step_thresh, "step_max": step_max, "step_clear": step_clear, "events": events, "site_track": site_track, "posture_log": posture_log, "posture_aborts": getattr(sim, "posture_aborts", 0),
             "posture_skipped": getattr(sim, "posture_skipped", 0), "memory": mem.to_dict(), "wall_s": time.perf_counter() - t0}
 
 

@@ -34,3 +34,18 @@ def test_narrow_compact_dip_is_not_a_step():
     X, Y, e, ok = _grid(lift=0.0)
     e[(np.abs(X - 1.2) < 0.2) & (np.abs(Y) < 0.2)] -= 0.03  # 40 cm hole: below the 0.6 m span
     assert transverse_steps(e, ok) == []
+
+
+def test_step_max_drops_large_faults_in_detect_candidates():
+    from go2wm.mission.perception import detect_candidates
+
+    X, Y, e, ok = _grid(lift=0.06, noise=0.0005)
+    pose = np.zeros(3)
+    on = [o for o in detect_candidates(e, np.ones_like(e), pose, 0.0, 1.5, step_thresh=0.006) if o.extra["via"] == "step"]
+    capped = [o for o in detect_candidates(e, np.ones_like(e), pose, 0.0, 1.5, step_thresh=0.006, step_max=0.02)
+              if o.extra["via"] == "step"]
+    assert capped == [] and (on == [] or on[0].extra["peak_dev_m"] > 0.02)
+    X, Y, e, ok = _grid(lift=0.011, noise=0.0005)
+    small = [o for o in detect_candidates(e, np.ones_like(e), pose, 0.0, 1.5, step_thresh=0.006, step_max=0.02)
+             if o.extra["via"] == "step"]
+    assert len(small) == 1
