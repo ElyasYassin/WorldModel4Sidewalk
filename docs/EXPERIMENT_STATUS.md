@@ -112,6 +112,7 @@ physics with ray-cast sensors (cameras off). Dev tile sets: seeds 0 and 100. Fre
 | P1-8b | Curb-aware perception, Isaac demo street | Go2-W stop & look false findings 17–18 → 1, errors ≤ 3 mm (crouched ≤ 0.2 mm); Go2 curb-aware stop & look fell once at the 110 mm hole | one run per row | `outputs/curb_aware/comparison.md` |
 | P1-8c | Curb-aware + robust memory on fresh seed 400 (pose errors on) | curb-aware: false / mission 1.42 → 0.83 (walk past), 1.38 → 0.62 (stop & look), worse on 0/48 tiles, +2 goals; robust: p90 error 6.8 → 3.7 mm but one 79 mm hole read 371 mm (partial-view rule) | effect comes from 2–3 drift blow-up tiles | `outputs/curb_aware_final3.md` |
 | P1-8d | 11 mm upheaval never found | the 12 mm detection threshold sits above the fault height; a transverse step detector (branch `small-step-detector`) finds every dev upheaval (21/21, was 15–16) with no extra false findings, and the 11 mm fault in Isaac (11.0 mm, D405) | the extra inspection stop shifts the robot sideways and puddles were missed (coverage) | `outputs/dev_step`, `outputs/small_step` |
+| P1-8e | Step detector v2 (cap 20 mm, skip near residual detections) | dev: 21/21 upheavals, false 0.25 → 0.08 / 0.12, no error tail; fresh seed 600: upheavals 13–14/22 → 21/22, false 0.25 → 0.17 / 0.42 → 0.25 (n.s.), no error regression; Isaac: 0 false, 11 mm read 11.0 mm | 3 puddles lost on seed 600 (1 explained by coverage); branch not merged | `outputs/small_step_final5.md` |
 
 ## Not implemented / not verified
 

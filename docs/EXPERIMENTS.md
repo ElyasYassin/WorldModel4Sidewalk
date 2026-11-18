@@ -1257,7 +1257,30 @@ Setup:
   - **v2** (commit c02d971; seed 500 is now used):
     - Steps are capped at 20 mm.
     - A step is skipped within 0.6 m of any residual detection in the same frame (`--step-max 0.02 --step-clear 0.6`).
-    - On the seed-500 tiles that went wrong, the large faults are back to roughly their detector-off values. Diagnosis only: the dev (seed 100) and fresh (seed 600) checks follow.
+    - On the seed-500 tiles that went wrong, the large faults are back to roughly their detector-off values. Diagnosis only; the dev and fresh checks are below.
+    - **In Isaac** (demo street, Go2-W stop & look): reached the goal, found 6 of 7, 0 false findings, and measured the 11 mm fault at 11.0 mm. The 110 mm hole read 323 mm because of the robust-rule failure above, not the step detector.
+    - **Dev (seed 100, `outputs/dev_step/compare.md`), detector off / v1 / v2:**
+
+      | strategy | upheavals found | false / mission | upheaval error p90 [mm] |
+      |---|---|---|---|
+      | walk past | 15/21 / 21/21 / 21/21 | 0.25 / 0.25 / 0.08 | 10.6 / 35.1 / 10.1 |
+      | stop & look | 16/21 / 21/21 / 21/21 | 0.25 / 0.21 / 0.12 | 5.1 / 1.1 / 3.3 |
+
+      v2 keeps v1's detection gain and removes v1's error tail (v1 also had a 185 mm walk-past error on dev).
+    - **Fresh check (seed 600, 24 new tiles, generated after v2 was frozen; `outputs/small_step_final5.md`), off vs v2:**
+
+      | strategy | arm | goal | upheavals | holes | puddles | false / mission | Δ false [95 % CI], perm. p | upheaval error med / p90 / max [mm] |
+      |---|---|---|---|---|---|---|---|---|
+      | walk past | off | 24/24 | 13/22 | 26/28 | 25/26 | 0.25 | – | 0.6 / 3.3 / 10.5 |
+      | walk past | v2 | 24/24 | 21/22 | 26/28 | 23/26 | 0.17 | −0.08 [−0.25, +0.08], p 0.63 | 0.4 / 3.0 / 6.4 |
+      | stop & look | off | 24/24 | 14/22 | 26/28 | 24/26 | 0.42 | – | 0.5 / 4.5 / 111.8 |
+      | stop & look | v2 | 24/24 | 21/22 | 26/28 | 23/26 | 0.25 | −0.17 [−0.42, +0.04], p 0.31 | 0.4 / 0.9 / 9.2 |
+
+      - Detection replicates: upheaval recall 59–64 % → 95 %; the new finds are 11–38 mm faults (one is the 11 mm class that was never found before).
+      - No error regression: hole errors are unchanged, and upheaval error tails are lower (the off arm's 111.8 mm was a wrongly measured fault that v2 gets right).
+      - False findings fall slightly but not significantly.
+      - **Cost: 3 puddles lost** (walk past tiles 5 and 21, stop & look tile 21; none gained). On tile 5 the lost puddle is 0.3 m from the newly found upheaval, which fits the coverage effect above. On tile 21 it is 8.5 m away, so that loss is not explained yet.
+    - Branch `small-step-detector` is not merged; the coverage cost should be fixed or accepted first.
 
 ### Video
 `outputs/videos/20_demo_mission_go2w_curb_posture_isaac_rtx.mp4`: Go2-W curb-aware stop & look + crouch, Isaac Sim 6.0.1 RTX.
