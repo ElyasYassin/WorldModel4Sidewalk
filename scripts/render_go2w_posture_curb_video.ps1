@@ -7,7 +7,7 @@ $TL = "D:/go2wm/outputs/curb_aware/timeline_go2w_posture_curb.json"
 $FR = "D:/go2wm/outputs/curb_aware/rtx_frames_posture"
 $OUT = "D:/go2wm/outputs/videos/20_demo_mission_go2w_curb_posture_isaac_rtx.mp4"
 $R = "D:/go2wm/render_env/Scripts/python.exe"
-$T = "Autonomous sidewalk inspection mission: Unitree Go2-W, curb-aware perception + inspection crouch (Isaac Lab physics)"
+$T = "Go2-W inspection mission: curb-aware perception + crouch (Isaac Lab)"
 $log = "D:\go2wm\outputs\curb_aware\video20_render.log"
 "[$(Get-Date -Format HH:mm:ss)] timeline" | Out-File -Append -Encoding utf8 $log
 cmd /c "$R scripts/render_demo_mission.py --mission $M --meshes D:/go2wm/outputs/go2w_meshes.npz --timeline-out $TL --title `"$T`" --out $OUT >> $log 2>&1"
