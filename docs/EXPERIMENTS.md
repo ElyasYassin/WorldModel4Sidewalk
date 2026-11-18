@@ -1189,7 +1189,7 @@ The first Go2-W demo missions looked weak: stop & look found 4/7 with 17 false f
 Setup:
 - Mock kinematics, realistic profile, with odometry drift + camera latency (the perception changes only act with pose errors).
 - 4 arms × 2 strategies. The tiles were generated after the freeze and never looked at before.
-- 14 of the 24 tiles have a curb.
+- 13 of the 24 tiles have a curb.
 - Script: `scripts/curb_aware_final_eval.ps1`. Table: `outputs/curb_aware_final3.md` (`scripts/compare_arms.py`).
 
 | strategy | arm | goal | time [s] | recall | found up / hole / puddle | false / mission | tiles fewer / more false | measurement error median / p90 / max [mm] |
