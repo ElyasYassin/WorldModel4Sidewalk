@@ -42,6 +42,7 @@ def main(argv=None) -> int:
     ap.add_argument("--robust", action="store_true", help="robust (median, outlier-rejecting) finding estimates")
     ap.add_argument("--curb-aware", action="store_true", help="ignore the curb found in each depth frame and correct "
                     "the lateral pose estimate against it")
+    ap.add_argument("--step-thresh", type=float, default=0.0, help="> 0: transverse step detector for small faults")
     ap.add_argument("--dyn-d405", action="store_true", help="D405 zone / stand-off from the actual camera geometry")
     ap.add_argument("--obstacle-slots", type=int, default=None, help="kinematic cylinders (site objects + people)")
     ap.add_argument("--obstacle-radius", type=float, default=None)
@@ -86,7 +87,8 @@ def main(argv=None) -> int:
                                  pc, safety, a.seed, "kinematic_mpc")
             res = run_mission(sim, ctrl, tile, Policy(pol, reach=a.reach, align=True, budget_steps=150, avoid_holes=True,
                                                      posture=tuple(a.posture) if a.posture else None, dyn_d405=a.dyn_d405), a.profile, seed=a.seed + a.tile, max_steps=a.max_steps,
-                              nav_cfg=pc["navigation"], pose_errors=a.pose_errors, on_step=rec, robust_memory=a.robust, curb_aware=a.curb_aware, log=lambda *x: None)
+                              nav_cfg=pc["navigation"], pose_errors=a.pose_errors, on_step=rec, robust_memory=a.robust, curb_aware=a.curb_aware,
+                              step_thresh=a.step_thresh, log=lambda *x: None)
             res["score"] = score_mission(res, tile)
             res.update(tile=a.tile, tiles_file=a.tiles, posture=a.posture, config=a.config,
                        checkpoint=cfg["isaac"].get("policy_checkpoint"), robot=sim.cfg.get("task"), backend="isaac_rough_policy", body_names=names, links=links)
