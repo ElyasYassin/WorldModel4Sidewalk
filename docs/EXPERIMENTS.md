@@ -1185,6 +1185,34 @@ The first Go2-W demo missions looked weak: stop & look found 4/7 with 17 false f
   - That is outside the scoring match radius, so the score counts it once as missed and once as false.
   - By location tolerance alone it is 6/7 found, 0 phantoms. This is a localisation error, not a detection error.
 
+### Held-out check of `--curb-aware` and robust memory (seed 400, 24 fresh tiles, frozen at commit 8c6799b)
+Setup:
+- Mock kinematics, realistic profile, with odometry drift + camera latency (the perception changes only act with pose errors).
+- 4 arms × 2 strategies. The tiles were generated after the freeze and never looked at before.
+- 14 of the 24 tiles have a curb.
+- Script: `scripts/curb_aware_final_eval.ps1`. Table: `outputs/curb_aware_final3.md` (`scripts/compare_arms.py`).
+
+| strategy | arm | goal | time [s] | recall | found up / hole / puddle | false / mission | tiles fewer / more false | measurement error median / p90 / max [mm] |
+|---|---|---|---|---|---|---|---|---|
+| walk past | base | 24/24 | 33.7 | 80 % | 25/36 / 25/32 / 24/25 | 1.42 | – | 1.9 / 14.1 / 42 |
+| walk past | curb-aware | 24/24 | 33.7 | 81 % | 25/36 / 26/32 / 24/25 | **0.83** | 2 / 0 | 1.9 / 14.1 / 42 |
+| walk past | robust | 24/24 | 33.7 | 80 % | same as base | 1.42 | 0 / 0 | 1.4 / **9.9** / 46 |
+| walk past | robust + curb | 24/24 | 33.7 | 81 % | same as curb | 0.83 | 2 / 0 | 1.4 / 9.9 / 46 |
+| stop & look | base | **21/24** | 45.4 | 76 % | 29/36 / 20/32 / 22/25 | 1.38 | – | 0.8 / 6.8 / 32 |
+| stop & look | curb-aware | **23/24** | 41.7 | 78 % | 29/36 / 22/32 / 22/25 | **0.62** | 2 / 0 | 0.8 / 6.2 / 32 |
+| stop & look | robust | 21/24 | 45.3 | 76 % | same as base | 1.38 | 0 / 0 | 0.7 / **3.7** / **292** |
+| stop & look | robust + curb | 23/24 | 41.6 | 78 % | same as curb | 0.62 | 2 / 0 | 0.8 / 4.2 / **292** |
+
+- **Curb-aware confirmed on fresh tiles: never worse, and it removes the drift blow-ups.**
+  - It changes the result on only the tiles where drift had pushed the curb into the walkway mask (tiles 9, 17, 19): false findings 8 → 2 and 11 → 3 (walk past), 10 → 1 and 10 → 1 (stop & look).
+  - It is worse on no tile (0 of 48 pairs). Stop & look reaches the goal on 2 more tiles and is 3.7 s faster.
+  - With only 2 changed tiles per strategy, a per-tile test cannot go below p = 0.5, so the evidence is "fixes the failure cases, harms nothing", not a population-level effect size.
+- **Robust memory: smaller tails, but the partial-view rule (dafab66) has a held-out failure.** The p90 error drops from 14.1 to 9.9 mm (walk past) and from 6.8 to 3.7 mm (stop & look). But one 79 mm hole on tile 16 reads 371 mm:
+  - Its 16 best readings are mostly 69–73 mm (partial views), plus 79.6/79.7, plus spurious deep readings of 101.6 and 640 mm.
+  - The rule keeps readings ≥ 0.85 × the 2nd-largest (101.6), so only {101.6, 640} survive. With fewer than 3 left, the MAD filter is skipped and the mean is used.
+  - Not fixed (this is a final set). Proposed guard, to be developed on dev sets and checked on a new fresh seed: if fewer than 3 readings survive the partial-view filter, use the median of all best-class readings (70.5 mm here).
+- Holes remain the weakest type with pose errors (20–26 of 32 found).
+
 ### Why the 11 mm upheaval is always missed
 - **Cause, by design:** `detect_candidates` flags cells that deviate from their 35 cm local median by more than 12 mm (more beyond 1 m). That threshold is above the fault itself, and a median filter keeps a clean step edge anyway, so only its corners would deviate.
 - **Measured:** in mock D555 frames 0.9–1.6 m before the fault, the largest residual is 6–9 mm; there are no detections at all near x = −18 m.
