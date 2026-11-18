@@ -1116,3 +1116,85 @@ Curb false positives: where the work zone squeezes the robot next to the 15 cm c
   - idle, look-around and digging poses;
   - unscaled, feet on the ground.
 - Video: `outputs/videos/17_demo_mission_isaac_rtx.mp4`.
+
+## Phase 1, step 8: Go2-W port (wheeled legs), curb-aware perception (2026-11-13 to 11-18)
+
+### What is ours and what is NVIDIA's / third-party
+- **Robot asset:** the Go2-W URDF from the robot_lab repository (Apache-2.0), used as data only, converted by Isaac Lab's URDF importer (`D:/go2wm/cache/go2w_usd`). Isaac Lab ships no Go2-W.
+- **Task and policy: trained by us.** `src/go2wm/sim/go2w_task.py` (`Go2WM-Velocity-Rough-Go2W-v0`) is Isaac Lab's Go2 rough task with:
+  - 12 leg position targets plus 4 wheel velocity targets;
+  - rewards re-weighted for a wheeled-legged robot, following robot_lab's Go2-W choices: track velocity 3.0 / 1.5, keep the leg pose near default (−0.5) so it rolls instead of stepping, no feet-air-time reward.
+  - We rewrote this task ourselves and did not run robot_lab's code.
+- **Training:** `scripts/train_go2w.py`, rsl_rl PPO, 4096 envs, 2000 iterations (about 3 h on the RTX 3090, with one resume after a memory-pressure stop at iteration 779). Final episode length 997/1000; linear-velocity tracking reward 2.6 of 3.0. Checkpoint: `D:/go2wm/ext/go2w_runs/rough/model_1999.pt`.
+- The Go2 runs still use NVIDIA's pretrained rough Go2 policy. All Go2 defaults are unchanged; Go2-W is its own config (`configs/isaac_go2w_rough.yaml`).
+
+### Locomotion check (`outputs/go2w/smoke_final.json`, flat tile)
+Passes with no fall, and **no dead zone**, unlike the pretrained Go2.
+
+| command | realized |
+|---|---|
+| 0.5 m/s forward | 0.55 m/s |
+| 1.0 m/s forward | 1.05 m/s |
+| 0.3 m/s lateral | 0.27 m/s |
+| 0.6 m/s lateral | 0.58 m/s |
+| 0.5 m/s arc + 0.5 rad/s | 0.49 m/s + 0.38 rad/s |
+
+### Sensor geometry finding: the D405 needs the crouch on the Go2-W
+Standing, the Go2-W carries the D405 at a slant range of 0.48–0.51 m to the ground, right at the camera's 0.5 m limit (`outputs/go2w_posture.log`). The same 3D-IK inspection pose as the Go2 (`IsaacGo2Adapter.set_posture`, 5 cm drop) brings it to 0.36 m. On the Go2, the crouch was a refinement; on the Go2-W it is required for close-range measurement.
+
+### First demo-street results and their diagnosis (2026-11-13/15)
+The first Go2-W demo missions looked weak: stop & look found 4/7 with 17 false findings; with the crouch, 3/7 with 18.
+- **Not the cause:** the robot or the crouch. Crouched readings of the 45 mm hole were within 0.1 mm.
+- **Cause:** lateral pose drift. Odometry drift reached 0.24 m, and up to 0.8 m once heading drift built up. That exceeds the 12 cm curb margin of the walkway mask, so the curb edge entered the mask and was logged as "holes".
+  - Stop & look then approached each of these, looping along the curb (x = 0–11 m).
+  - The drifted positions also made real defects score as missed.
+
+### Fixes (all off by default, so the frozen evaluations are unchanged)
+- `--curb-aware`:
+  - `perception.curb_mask` drops the curb strip found in each depth frame itself, not from the map under the drifting pose;
+  - `perception.curb_lateral` measures the curb's offset and angle in the frame, and `PoseErrors.correct` pulls the lateral and heading estimate toward the mapped curb, like localising against a curb;
+  - `replan()` falls back to the plain route instead of crashing.
+  - Unit tests: `tests/test_curb_aware.py`.
+- **Robust memory, partial-view rule** (commit dafab66): while the robot approaches a hole, the D405 first sees only its near part, which can only read shallow. Robust memory now keeps depression readings ≥ 0.85 × the 2nd-largest before the MAD filter and median. Applied to all saved robust runs below.
+
+### Demo street, before vs with `--curb-aware` (Isaac physics, realistic sensors + drift + latency, robust memory)
+`D:/go2wm/outputs/curb_aware/comparison.md`. One run per row: Isaac run-to-run variance is large, so read single-defect differences with care.
+
+| run | outcome | time [s] | inspections | found | median / worst error [mm] | false findings |
+|---|---|---|---|---|---|---|
+| Go2 walk past | goal | 85.9 | 0 | 6/7 | 0.9 / 1.4 | 1 |
+| Go2 walk past, curb-aware | goal | 86.0 | 0 | 5/7 | 16.6 / 31.5 | 1 |
+| Go2 stop & look | goal | 102.1 | 6 | 6/7 | 0.7 / 9.8 | 4 |
+| Go2 stop & look, curb-aware | **fall** at x = 18.9 m | 89.7 | 3 | 4/7 | 0.6 / 1.3 | 0 |
+| Go2-W walk past | goal | 80.3 | 0 | 5/7 | 1.0 / 1.1 | 6 |
+| Go2-W walk past, curb-aware | goal | 80.3 | 0 | 5/7 | 1.3 / 1.6 | 7 |
+| Go2-W stop & look | goal | 115.6 | 18 | 4/7 | 0.2 / 0.4 | 17 |
+| **Go2-W stop & look, curb-aware** | goal | 89.0 | 5 | **6/7** | 0.1 / 2.9 | **1** |
+| Go2-W stop & look + crouch | goal | 170.7 | 17 | 3/7 | 17.2 / 34.4 | 18 |
+| **Go2-W stop & look + crouch, curb-aware** | goal | 101.7 | 4 (4 crouches) | 5/7 | **0.1 / 0.2** | **1** |
+
+- **Go2-W stop & look:** curb-aware removes the curb loop. False findings drop from 17–18 to 1, the mission is 26–69 s shorter, and every measured defect is within 3 mm (crouched: within 0.2 mm).
+- **Go2-W walk past:** no change (6 → 7 false findings).
+  - 2 are the 45 mm upheaval reported as a depression: a type confusion, not a phantom.
+  - 5 lie at x = 22.6–26 m, y ≈ −1.1 to −1.3 m, near the curb at the street's end. The walk-past robot passes there without stopping, so the curb fix has less time to act; still open.
+- **Go2 stop & look, curb-aware fell** at the 110 mm hole while turning away after inspecting it. The pose estimate was within 5 cm at the fall, but its lateral error had reached 0.45 m earlier in the run (corrections act only while the heading is within ±18° of the walk). A legged robot near a deep hole stays a risk; one run, so no cause is claimed.
+- **Never found, by any robot or strategy: the 11 mm upheaval.** See the next subsection.
+- The crouched curb-aware Go2-W run's "missed" 110 mm hole and its 1 false finding are the same finding.
+  - The robot crouched over the hole and measured 109.4 mm (−0.6 mm).
+  - It placed the hole at (18.70, 0.68), 0.36 m from the true (18.60, 0.32), almost all of it lateral (cause not yet separated: pose error vs. a centroid biased toward the part of the hole in view).
+  - That is outside the scoring match radius, so the score counts it once as missed and once as false.
+  - By location tolerance alone it is 6/7 found, 0 phantoms. This is a localisation error, not a detection error.
+
+### Why the 11 mm upheaval is always missed
+- **Cause, by design:** `detect_candidates` flags cells that deviate from their 35 cm local median by more than 12 mm (more beyond 1 m). That threshold is above the fault itself, and a median filter keeps a clean step edge anyway, so only its corners would deviate.
+- **Measured:** in mock D555 frames 0.9–1.6 m before the fault, the largest residual is 6–9 mm; there are no detections at all near x = −18 m.
+- **Why it matters:** 6–13 mm is the ADA band where a vertical change needs a bevel, so these faults count for the [< 1 cm requirement].
+- **Candidate fix (branch `small-step-detector`, off by default):** `perception.transverse_steps` compares the median of the 3 rows ahead with the 3 rows behind each row boundary, column by column. It is detrended against the same response one window further on, so grades cancel. A step is a run of one sign above 6 mm spanning ≥ 0.6 m across the walk, 0.5–1.8 m ahead.
+  - In single frames on the demo street, it finds the 11 mm fault at 10.6–11.2 mm and the other two upheavals.
+  - It fires nowhere else: holes, puddles, cracks and the curb give nothing.
+  - Dev-set check (seed 100) and a fresh-seed check: see below.
+
+### Video
+`outputs/videos/20_demo_mission_go2w_curb_posture_isaac_rtx.mp4`: Go2-W curb-aware stop & look + crouch, Isaac Sim 6.0.1 RTX.
+- Video 18 (Nov 13) has the replay bug in which the robot sinks through the slab: render steps simulated the robot's rigid bodies.
+- Videos 19 and 20 are rendered with the fix (`isaac_rtx_replay.py` strips the robot's physics).
