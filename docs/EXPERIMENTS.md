@@ -1210,7 +1210,11 @@ Setup:
 - **Robust memory: smaller tails, but the partial-view rule (dafab66) has a held-out failure.** The p90 error drops from 14.1 to 9.9 mm (walk past) and from 6.8 to 3.7 mm (stop & look). But one 79 mm hole on tile 16 reads 371 mm:
   - Its 16 best readings are mostly 69–73 mm (partial views), plus 79.6/79.7, plus spurious deep readings of 101.6 and 640 mm.
   - The rule keeps readings ≥ 0.85 × the 2nd-largest (101.6), so only {101.6, 640} survive. With fewer than 3 left, the MAD filter is skipped and the mean is used.
-  - Not fixed (this is a final set). Proposed guard, to be developed on dev sets and checked on a new fresh seed: if fewer than 3 readings survive the partial-view filter, use the median of all best-class readings (70.5 mm here).
+  - Not fixed (this is a final set).
+  - **The same rule failed again in Isaac** (step detector v2 run, demo street).
+    - The 110 mm hole's 21 best readings include the true cluster at 107.6–111.2 mm and three spurious deep readings (301, 345, 656 mm).
+    - The 0.85 × 2nd-largest bar keeps exactly those three, so the hole reads 323 mm.
+  - A "fewer than 3 survive" guard would not catch this case. The rule needs a redesign. Candidate: the deepest cluster with ≥ 3 readings within ±5 mm of each other, falling back to the median of all best-class readings. Develop it on the saved readings of the dev and Isaac runs, then check it on a new fresh seed.
 - Holes remain the weakest type with pose errors (20–26 of 32 found).
 
 ### Why the 11 mm upheaval is always missed
@@ -1220,7 +1224,40 @@ Setup:
 - **Candidate fix (branch `small-step-detector`, off by default):** `perception.transverse_steps` compares the median of the 3 rows ahead with the 3 rows behind each row boundary, column by column. It is detrended against the same response one window further on, so grades cancel. A step is a run of one sign above 6 mm spanning ≥ 0.6 m across the walk, 0.5–1.8 m ahead.
   - In single frames on the demo street, it finds the 11 mm fault at 10.6–11.2 mm and the other two upheavals.
   - It fires nowhere else: holes, puddles, cracks and the curb give nothing.
-  - Dev-set check (seed 100) and a fresh-seed check: see below.
+  - **Dev set** (seed 100, mock, realistic, no pose errors; `outputs/dev_step/compare.md`):
+
+    | strategy | upheavals found, off → on | false / mission, off → on |
+    |---|---|---|
+    | walk past | 15/21 → **21/21** | 0.25 → 0.25 |
+    | stop & look | 16/21 → **21/21** | 0.25 → 0.21 |
+
+    - Recall rises from 82 to 92 % (walk past) and from 88 to 96 % (stop & look).
+    - The newly found faults are 12–22 mm. Measured with stop & look, they are within 0.4 mm, all by the D405 except the 17 and 18 mm faults (D555).
+  - **Isaac demo street**, Go2-W stop & look + crouch + curb-aware (`outputs/small_step/comparison.md`, one run):
+    - The 11 mm upheaval is found and measured at **11.0 mm** (D405), and the 110 mm hole at 110.6 mm. 0 false findings.
+    - But both puddles were missed, and the run ended in a fall: crouching on the 28 mm upheaval's raised slab, the roll abort fired at 104.8 s and the robot fell (x = 23.0, y = −1.0).
+  - **Why the puddles were missed (reproduced in mock, deterministic):** not a false step edge; every step hit lies on the real fault.
+    - The robot now stops at the 11 mm fault (y ≈ −0.55), and from there passes the 15 mm puddle (y 0.07 to 1.17) on a line about 0.5 m further toward the road.
+    - Dropouts are only counted 0.7–1.4 m ahead, so from that line most of the puddle is outside the zone.
+    - Inspecting more defects displaces the robot laterally and narrows coverage.
+    - Candidate fixes (mission level, not tried): return to the route centreline after an inspection, or flag uncovered walkway in the report (the coverage map exists).
+  - **Fresh tiles, seed 500** (detector v1 frozen at 48ccf3a, mock, realistic, no pose errors; `outputs/small_step_final4.md`):
+
+    | strategy | recall off → on | upheavals off → on | false / mission off → on | upheaval error p90 / max off → on [mm] |
+    |---|---|---|---|---|
+    | walk past | 85 → 95 % | 22/30 → **30/30** | 0.25 → 0.17 | 8.1 / 11 → **27.5 / 52** |
+    | stop & look | 83 → 93 % | 22/30 → **30/30** | 0.38 → 0.38 | 8.3 / 20 → **16.1 / 79** |
+
+    - Detection replicates on unseen tiles: every upheaval is found, and false findings do not rise.
+    - The newly found faults (13–29 mm) are mostly measured within 1 mm (stop & look, D405). Walk past measured one 14 mm fault at 7.7 mm.
+    - **Regression: large step-down faults (48–80 mm) are mis-measured**, up to a sign flip (stop & look: 80 mm read 1.2 mm, 63 mm read +78.9 mm).
+      - Seen from its high side, such a fault casts an occlusion shadow. The residual path sees the low side as clusters, but the step detector places the edge at the shadow's far end.
+      - Those observations merge into the fault's finding and pull the measurements to the wrong place.
+    - The stop & look strategy also lost one hole and one puddle while gaining two puddles. This matches the coverage effect above.
+  - **v2** (commit c02d971; seed 500 is now used):
+    - Steps are capped at 20 mm.
+    - A step is skipped within 0.6 m of any residual detection in the same frame (`--step-max 0.02 --step-clear 0.6`).
+    - On the seed-500 tiles that went wrong, the large faults are back to roughly their detector-off values. Diagnosis only: the dev (seed 100) and fresh (seed 600) checks follow.
 
 ### Video
 `outputs/videos/20_demo_mission_go2w_curb_posture_isaac_rtx.mp4`: Go2-W curb-aware stop & look + crouch, Isaac Sim 6.0.1 RTX.

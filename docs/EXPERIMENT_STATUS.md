@@ -5,7 +5,7 @@ Artifact paths are under the data root `D:/go2wm` (`configs/paths.yaml`). Every 
 **simulation** (Isaac Lab Go2, pretrained flat-terrain policy, flat ground, cylinder obstacles)
 unless marked mock. Nothing has run on hardware.
 
-Updated 2026-11-11.
+Updated 2026-11-18 (Phase 1 inspection results: section at the end).
 
 ## Evaluation roles (frozen, `configs/eval_protocol.yaml`)
 
@@ -94,6 +94,24 @@ The deadband-aware speed floor (`min_speed` 0.4) is what fixes the conventional 
 config with it reaches 32–34/34, every config without it 28–31/34. With a comparable tuning budget
 the conventional controller matches the MPCs (34/34) on the dev scenes. Whether any planner
 difference survives on fresh scenes is the question for E3f.
+
+## Phase 1: sidewalk inspection missions (2026-11-11 to 11-18)
+
+Defect tiles (upheaval faults, holes, puddles, cracks), D555 detection + D405 close-up, scene-graph memory, inspection
+strategies walk past / slow / stop & look, report generator. Mock = kinematic robot with ray-cast sensors; Isaac = Isaac Lab
+physics with ray-cast sensors (cameras off). Dev tile sets: seeds 0 and 100. Fresh final sets, each used once: 200 (v1),
+300 (v2), 400 (curb-aware + robust), 500 (step detector).
+
+| exp | question | result | caveat | artifacts |
+|---|---|---|---|---|
+| P1-5 | Strategies on fresh tiles (seed 200, frozen 596cdb4) | walk past 86 % recall, 0 false findings; stop & look adds D405 evidence (hole err 2.8 → 0.7 mm) but 0.38 false / mission | mock, no pose errors | `outputs/missions_final` |
+| P1-5b | v2 rules (multi-view, hole walls) on fresh seed 300 | approach precision 86 → 91 %, recall 83 % = walk past; upheavals weakest (67–71 %) | mock, no pose errors | `outputs/missions_final2` |
+| P1-6 | Isaac physics missions | real gait exposed approach heading/dead-zone stalls and a fall into a hole; fixed with align + hole keep-out | Isaac Go2 rough policy, single tiles | `outputs/isaac_missions` |
+| P1-7 | Demo street (people, work zone, crouch) | missions complete with yields; crouch gives D405 at 31 cm | one run per config | `outputs/demo_mission` |
+| P1-8a | Go2-W port | our own Go2-W task + PPO policy (2000 it): no dead zone; D405 at its 0.5 m limit standing → crouch needed | URDF from robot_lab (data only) | `D:/go2wm/ext/go2w_runs/rough` |
+| P1-8b | Curb-aware perception, Isaac demo street | Go2-W stop & look false findings 17–18 → 1, errors ≤ 3 mm (crouched ≤ 0.2 mm); Go2 curb-aware stop & look fell once at the 110 mm hole | one run per row | `outputs/curb_aware/comparison.md` |
+| P1-8c | Curb-aware + robust memory on fresh seed 400 (pose errors on) | curb-aware: false / mission 1.42 → 0.83 (walk past), 1.38 → 0.62 (stop & look), worse on 0/48 tiles, +2 goals; robust: p90 error 6.8 → 3.7 mm but one 79 mm hole read 371 mm (partial-view rule) | effect comes from 2–3 drift blow-up tiles | `outputs/curb_aware_final3.md` |
+| P1-8d | 11 mm upheaval never found | the 12 mm detection threshold sits above the fault height; a transverse step detector (branch `small-step-detector`) finds every dev upheaval (21/21, was 15–16) with no extra false findings, and the 11 mm fault in Isaac (11.0 mm, D405) | the extra inspection stop shifts the robot sideways and puddles were missed (coverage) | `outputs/dev_step`, `outputs/small_step` |
 
 ## Not implemented / not verified
 
