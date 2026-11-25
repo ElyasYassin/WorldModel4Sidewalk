@@ -34,13 +34,17 @@ def one_mission(job):
     sim = MockMissionSim(load_config("configs/mock.yaml"), tile)
     safety = SafetyFilter({**pc["safety"], "limits": pc["limits"], "robot_radius": pc["robot_radius"]})
     ctrl = MPCController(ModelPredictor(KinematicBaseline(1, "command")), pc, safety, a["seed"], "kinematic_mpc")
-    res = run_mission(sim, ctrl, tile, Policy(pol), a["profile"], seed=a["seed"] + ti, log=lambda *x: None,
+    res = run_mission(sim, ctrl, tile, Policy(pol, dyn_d405=a.get("dyn_d405", False)), a["profile"], seed=a["seed"] + ti, log=lambda *x: None,
                       pose_errors=a.get("pose_errors", False), robust_memory=a.get("robust", False),
                       curb_aware=a.get("curb_aware", False), step_thresh=a.get("step_thresh", 0.0),
                       step_max=a.get("step_max", float("inf")),
                       step_clear=a.get("step_clear", 0.3))
     res["score"] = score_mission(res, tile)
     res["tile"] = ti
+    from go2wm.sim.sensors import SENSOR_SPECS
+
+    res["sensor_mounts"] = {s: {k: SENSOR_SPECS[s][k] for k in ("mount_pos", "pitch_deg")}
+                            for s in ("depth_d555", "depth_d405")}  # as seen by this (worker) process
     (Path(a["out"]) / f"{pol}_tile{ti}.json").write_text(json.dumps(res, default=float))
     sc = res["score"]
     print(f"[{pol}] tile {ti}: {res['outcome']} in {res['time_s']:.1f} s, findings {sc['n_findings']} "
@@ -69,12 +73,23 @@ def main() -> int:
                     "(e.g. 0.006 m); off by default")
     ap.add_argument("--overwrite", action="store_true", help="rerun missions that already have a result file")
     ap.add_argument("--workers", type=int, default=1, help="missions run in parallel processes")
+    ap.add_argument("--dyn-d405", action="store_true", help="D405 zone / stand-off from the actual camera geometry")
+    ap.add_argument("--mounts", default=None, help="sensor mount overrides as JSON, e.g. "
+                    "{\"depth_d405\": {\"pitch_deg\": 50}}; workers inherit it via GO2WM_SENSOR_MOUNTS")
     a = ap.parse_args()
+    if a.mounts:
+        import os
+
+        from go2wm.sim.sensors import apply_mount_overrides
+
+        os.environ["GO2WM_SENSOR_MOUNTS"] = a.mounts  # worker processes re-import sensors.py and pick it up
+        apply_mount_overrides(a.mounts)
     tiles = json.loads(resolve_path(a.tiles).read_text())
     out = resolve_path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     cfg = {"planner": a.planner, "seed": a.seed, "profile": a.profile, "out": str(out), "pose_errors": a.pose_errors,
-           "robust": a.robust, "curb_aware": a.curb_aware, "step_thresh": a.step_thresh, "step_max": a.step_max, "step_clear": a.step_clear}
+           "robust": a.robust, "curb_aware": a.curb_aware, "step_thresh": a.step_thresh, "step_max": a.step_max, "step_clear": a.step_clear,
+           "dyn_d405": a.dyn_d405, "mounts": a.mounts}
     done, jobs = {}, []
     for pol in a.policies:
         for ti in a.use:

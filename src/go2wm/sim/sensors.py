@@ -64,6 +64,33 @@ RGB_SPEC = {"mount_pos": [0.32, 0.0, 0.04], "pitch_deg": 10.0, "hfov_deg": 100.0
             "device": "Go2 front camera (approx.)"}
 
 
+def apply_mount_overrides(overrides: dict[str, dict[str, Any]] | str | None) -> None:
+    """Patch sensor mounts in place, e.g. {"depth_d405": {"mount_pos": [0.33, 0, 0.08], "pitch_deg": 50}} (mount
+    studies). Also read from the GO2WM_SENSOR_MOUNTS environment variable (JSON) at import, so worker processes
+    inherit it."""
+    import json
+
+    if isinstance(overrides, str):
+        overrides = json.loads(overrides)
+    for name, upd in (overrides or {}).items():
+        if name not in SENSOR_SPECS:
+            raise KeyError(f"unknown sensor {name!r}")
+        bad = set(upd) - {"mount_pos", "pitch_deg"}
+        if bad:
+            raise KeyError(f"only mount_pos / pitch_deg can be overridden, got {sorted(bad)}")
+        SENSOR_SPECS[name].update(upd)
+
+
+def _env_mounts() -> None:
+    import os
+
+    if os.environ.get("GO2WM_SENSOR_MOUNTS"):
+        apply_mount_overrides(os.environ["GO2WM_SENSOR_MOUNTS"])
+
+
+_env_mounts()
+
+
 def pitch_matrix(pitch_deg: float) -> np.ndarray:
     """Rotation about +y; positive pitch turns the sensor's +x towards -z (looks down)."""
     t = np.radians(pitch_deg)

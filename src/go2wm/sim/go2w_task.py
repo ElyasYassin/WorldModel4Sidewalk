@@ -116,8 +116,170 @@ class Go2WRoughPPORunnerCfg(RslRlOnPolicyRunnerCfg):
                                      schedule="adaptive", gamma=0.99, lam=0.95, desired_kl=0.01, max_grad_norm=1.0)
 
 
+# ------------------------------------------------------------------------------------------------- sim-to-real variant
+# Go2WM-Velocity-Rough-Go2W-DR-v0: the same robot / rewards with domain randomization aimed at the real Go2-W and
+# sidewalk terrain added to the mix. Randomized: robot friction (static 0.3-1.25, dynamic <= static), base mass -1..+4 kg
+# (cameras, bracket, battery), base centre of mass (front-heavy sensor mounts), leg PD gains and wheel damping x0.8-1.2
+# (motor strength), action delay 0-2 policy steps (0-40 ms, per env, resampled on reset), pushes every 8-12 s.
+# Terrain: Isaac Lab's rough mix plus random 8 m crops of the Trimble X7 sidewalk scan (flipped at random) and
+# random sidewalk tiles (slabs, grades, cross-slope, curbs; go2wm.sim.terrain.random_sidewalk_tile).
+
+import numpy as np  # noqa: E402
+import torch  # noqa: E402
+from isaaclab.envs.mdp.actions.actions_cfg import JointPositionActionCfg, JointVelocityActionCfg  # noqa: E402
+from isaaclab.envs.mdp.actions.joint_actions import JointPositionAction, JointVelocityAction  # noqa: E402
+from isaaclab.managers import EventTermCfg as EventTerm  # noqa: E402
+
+SCAN_HEIGHTMAP = "D:/go2wm/scan/sidewalk_tdx/heightmap.npz"
+
+
+class _DelayMixin:
+    """Applies the policy action from `delay` steps ago (per env, resampled on reset)."""
+
+    def _init_delay(self):
+        self._dbuf = torch.zeros(self.cfg.max_delay + 1, self.num_envs, self.action_dim, device=self.device)
+        self._delay = torch.randint(self.cfg.min_delay, self.cfg.max_delay + 1, (self.num_envs,), device=self.device)
+        self._env_idx = torch.arange(self.num_envs, device=self.device)
+
+    def _delayed(self, actions: torch.Tensor) -> torch.Tensor:
+        self._dbuf = torch.roll(self._dbuf, 1, 0)
+        self._dbuf[0] = actions
+        return self._dbuf[self._delay, self._env_idx]
+
+    def _reset_delay(self, env_ids):
+        ids = slice(None) if env_ids is None else env_ids
+        n = self.num_envs if env_ids is None else len(env_ids)
+        self._dbuf[:, ids] = 0.0
+        self._delay[ids] = torch.randint(self.cfg.min_delay, self.cfg.max_delay + 1, (n,), device=self.device)
+
+
+class DelayedJointPositionAction(_DelayMixin, JointPositionAction):
+    def __init__(self, cfg, env):
+        super().__init__(cfg, env)
+        self._init_delay()
+
+    def process_actions(self, actions):
+        super().process_actions(self._delayed(actions))
+
+    def reset(self, env_ids=None):
+        super().reset(env_ids)
+        self._reset_delay(env_ids)
+
+
+class DelayedJointVelocityAction(_DelayMixin, JointVelocityAction):
+    def __init__(self, cfg, env):
+        super().__init__(cfg, env)
+        self._init_delay()
+
+    def process_actions(self, actions):
+        super().process_actions(self._delayed(actions))
+
+    def reset(self, env_ids=None):
+        super().reset(env_ids)
+        self._reset_delay(env_ids)
+
+
+@configclass
+class DelayedJointPositionActionCfg(JointPositionActionCfg):
+    class_type: type = DelayedJointPositionAction
+    min_delay: int = 0
+    max_delay: int = 2
+
+
+@configclass
+class DelayedJointVelocityActionCfg(JointVelocityActionCfg):
+    class_type: type = DelayedJointVelocityAction
+    min_delay: int = 0
+    max_delay: int = 2
+
+
+def _sidewalk_sub_terrains(scan_file: str = SCAN_HEIGHTMAP, scan_prop: float = 0.15, tile_prop: float = 0.15):
+    """Height-field sub-terrains: random crops of the measured scan and random sidewalk tiles (pure numpy)."""
+    from isaaclab.terrains.height_field.hf_terrains_cfg import HfTerrainBaseCfg
+    from isaaclab.terrains.height_field.utils import height_field_to_mesh
+
+    from .terrain import _load_heightmap, heightmap_height, params_with_defaults, random_sidewalk_tile, sidewalk_height
+
+    def _grid(cfg):
+        nx, ny = int(round(cfg.size[0] / cfg.horizontal_scale)), int(round(cfg.size[1] / cfg.horizontal_scale))
+        return (np.arange(nx) * cfg.horizontal_scale - 0.5 * cfg.size[0],
+                np.arange(ny) * cfg.horizontal_scale - 0.5 * cfg.size[1])
+
+    @height_field_to_mesh
+    def _scan_crop(difficulty: float, cfg) -> np.ndarray:
+        z, res, x0, _ = _load_heightmap(cfg.scan_file)
+        xs, ys = _grid(cfg)
+        L = z.shape[0] * res
+        cx = np.random.uniform(x0 + 0.5 * cfg.size[0], x0 + L - 0.5 * cfg.size[0])
+        sx, sy = np.random.choice([-1.0, 1.0], 2)
+        h = heightmap_height(cx + sx * xs[:, None], sy * ys[None, :], cfg.scan_file)
+        h = h - np.median(h)
+        return np.round(h / cfg.vertical_scale).astype(np.int16)
+
+    @height_field_to_mesh
+    def _sidewalk_tile(difficulty: float, cfg) -> np.ndarray:
+        p = params_with_defaults(random_sidewalk_tile(np.random.default_rng(np.random.randint(1 << 31))))
+        xs, ys = _grid(cfg)
+        cx = np.random.uniform(4.0, 9.0)  # features lie at x 2-12 in tile coordinates
+        h = sidewalk_height(cx + xs[:, None], ys[None, :], p, grid=cfg.horizontal_scale)
+        h = h - np.median(h)
+        return np.round(h / cfg.vertical_scale).astype(np.int16)
+
+    hm_path = scan_file
+
+    @configclass
+    class ScanCropCfg(HfTerrainBaseCfg):
+        function = _scan_crop
+        scan_file: str = hm_path
+
+    @configclass
+    class SidewalkTileCfg(HfTerrainBaseCfg):
+        function = _sidewalk_tile
+
+    return {"scan_crop": ScanCropCfg(proportion=scan_prop, border_width=0.25),
+            "sidewalk_tile": SidewalkTileCfg(proportion=tile_prop, border_width=0.25)}
+
+
+@configclass
+class Go2WRoughDREnvCfg(Go2WRoughEnvCfg):
+    def __post_init__(self):
+        super().__post_init__()
+        self.actions.joint_pos = DelayedJointPositionActionCfg(
+            asset_name="robot", joint_names=LEG_JOINTS, scale={".*_hip_joint": 0.125, ".*_(thigh|calf)_joint": 0.25},
+            use_default_offset=True, preserve_order=True)
+        self.actions.joint_vel = DelayedJointVelocityActionCfg(
+            asset_name="robot", joint_names=WHEEL_JOINTS, scale=5.0, use_default_offset=True, preserve_order=True)
+        ev = self.events
+        ev.physics_material.params.update(static_friction_range=(0.3, 1.25), dynamic_friction_range=(0.25, 1.0),
+                                          restitution_range=(0.0, 0.1), make_consistent=True)
+        ev.add_base_mass.params["mass_distribution_params"] = (-1.0, 4.0)
+        ev.base_com = EventTerm(func=mdp.randomize_rigid_body_com, mode="startup",
+                                params={"asset_cfg": SceneEntityCfg("robot", body_names="base"),
+                                        "com_range": {"x": (-0.03, 0.06), "y": (-0.03, 0.03), "z": (-0.02, 0.02)}})
+        ev.leg_gains = EventTerm(func=mdp.randomize_actuator_gains, mode="reset",
+                                 params={"asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS),
+                                         "stiffness_distribution_params": (0.8, 1.2),
+                                         "damping_distribution_params": (0.8, 1.2), "operation": "scale"})
+        ev.wheel_gains = EventTerm(func=mdp.randomize_actuator_gains, mode="reset",
+                                   params={"asset_cfg": SceneEntityCfg("robot", joint_names=WHEEL_JOINTS),
+                                           "damping_distribution_params": (0.8, 1.2), "operation": "scale"})
+        ev.push_robot = EventTerm(func=mdp.push_by_setting_velocity, mode="interval", interval_range_s=(8.0, 12.0),
+                                  params={"velocity_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5)}})
+        gen = self.scene.terrain.terrain_generator
+        if gen is not None:
+            gen.sub_terrains = {**gen.sub_terrains, **_sidewalk_sub_terrains()}
+
+
+@configclass
+class Go2WRoughDRPPORunnerCfg(Go2WRoughPPORunnerCfg):
+    experiment_name = "go2w_rough_dr"
+
+
 TASK_ROUGH = "Go2WM-Velocity-Rough-Go2W-v0"
-if TASK_ROUGH not in gym.registry:
-    gym.register(id=TASK_ROUGH, entry_point="isaaclab.envs:ManagerBasedRLEnv", disable_env_checker=True,
-                 kwargs={"env_cfg_entry_point": f"{__name__}:Go2WRoughEnvCfg",
-                         "rsl_rl_cfg_entry_point": f"{__name__}:Go2WRoughPPORunnerCfg"})
+TASK_ROUGH_DR = "Go2WM-Velocity-Rough-Go2W-DR-v0"
+for _tid, _env, _run in ((TASK_ROUGH, "Go2WRoughEnvCfg", "Go2WRoughPPORunnerCfg"),
+                         (TASK_ROUGH_DR, "Go2WRoughDREnvCfg", "Go2WRoughDRPPORunnerCfg")):
+    if _tid not in gym.registry:
+        gym.register(id=_tid, entry_point="isaaclab.envs:ManagerBasedRLEnv", disable_env_checker=True,
+                     kwargs={"env_cfg_entry_point": f"{__name__}:{_env}",
+                             "rsl_rl_cfg_entry_point": f"{__name__}:{_run}"})
