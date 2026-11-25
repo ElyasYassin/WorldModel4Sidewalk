@@ -159,11 +159,15 @@ def curb_lateral(elev: np.ndarray, drop: float = 0.08, min_len: float = 0.8, min
 def detect_candidates(elev: np.ndarray, count: np.ndarray, pose: np.ndarray, t: float, walk_half: float,
                       thresh: float = 0.012, thresh_per_m: float = 0.008, max_range: float = 2.5, min_cells: int = 3,
                       sensor: str = "depth_d555", edge_min_span: float = 0.6,
-                      curb_drop: float = 0.0) -> list[Observation]:
+                      curb_drop: float = 0.0, step_thresh: float = 0.0, step_range: tuple[float, float] = (0.5, 1.8),
+                      step_max: float = float("inf"), step_clear: float = 0.3) -> list[Observation]:
     """Clusters of cells deviating from the local median. The threshold grows with range beyond 1 m (noise grows
     with depth). A step produces a raised cluster on its high side and a depressed one on its low side, and a hole
     a raised far rim: touching clusters of opposite sign are merged into the dominant one (peak x cells).
-    `curb_drop` > 0 also drops cells at or next to a curb found in the frame itself (`curb_mask`)."""
+    `curb_drop` > 0 also drops cells at or next to a curb found in the frame itself (`curb_mask`).
+    `step_thresh` > 0 adds the transverse step detector (`transverse_steps`) for faults below `thresh`; `step_max`
+    drops its steps above that size (large faults are found by the residual path, and a step down seen from its high
+    side casts an occlusion shadow that the step detector places at the shadow's far end, i.e. at the wrong x)."""
     res = elev - _median_filter(elev)
     X, Y = to_world(pose, CX[:, None], CY[None, :])
     xr_grid = np.broadcast_to(CX[:, None], res.shape)
@@ -217,6 +221,13 @@ def detect_candidates(elev: np.ndarray, count: np.ndarray, pose: np.ndarray, t: 
         else:
             for c in g:
                 merged.append({**c, "kind": "depression"} if c["kind"] == "edge" else c)
+    if step_thresh > 0:  # small transverse faults the local-median residual cannot reach (it keeps a clean edge)
+        # only where the residual path saw nothing in this frame: next to a large fault the occluded low side shows
+        # up as residual clusters (edge or depression) and the step detector would place the fault at the wrong x
+        known = [float(CX[c["idx"][:, 0]].mean()) for c in merged]
+        for st in transverse_steps(elev, ok, step_thresh, step_range, edge_min_span):
+            if st["step"] <= step_max and all(abs(st["xr"] - k) > step_clear for k in known):
+                merged.append({"kind": "edge", "idx": st["idx"], "peak": st["step"], "via": "step"})
     out = []
     for c in merged:
         i, j = c["idx"][:, 0], c["idx"][:, 1]
@@ -225,9 +236,58 @@ def detect_candidates(elev: np.ndarray, count: np.ndarray, pose: np.ndarray, t: 
         out.append(Observation(t, sensor, c["kind"], np.array([wx, wy]), float(np.hypot(xr, yr)),
                                value_m=None, extent_m=float(max(np.ptp(CX[i]), np.ptp(CY[j])) + ELEV_GRID["res"]),
                                confidence=0.4, provenance="detected",
-                               extra={"peak_dev_m": c["peak"], "cells": int(len(c["idx"])), "view_xy": [float(pose[0]), float(pose[1])],
+                               extra={"peak_dev_m": c["peak"], "cells": int(len(c["idx"])), "via": c.get("via", "residual"), "view_xy": [float(pose[0]), float(pose[1])],
                                       "y_span": [float(to_world(pose, xr, CY[j].min())[1]),
                                                  float(to_world(pose, xr, CY[j].max())[1])]}))
+    return out
+
+
+def transverse_steps(elev: np.ndarray, ok: np.ndarray, thresh: float = 0.006, rng: tuple[float, float] = (0.5, 1.8),
+                     min_span: float = 0.6, w: int = 3, max_gap: int = 1) -> list[dict[str, Any]]:
+    """Transverse level shifts (upheaval faults) in one frame: per grid column, the median of the `w` rows ahead
+    minus the `w` rows behind each row boundary, detrended by the mean of the same response one window further on
+    either side (a uniform grade gives the same response everywhere, a step only at its boundary). A step is a run
+    of columns (gaps <= `max_gap`) of one sign above `thresh` spanning >= `min_span` across the walk, in rows
+    `rng` ahead (dense, low noise). Responses within 0.3 m along x are one step (the strongest run kept).
+    Returns dicts: xr (robot-frame x of the boundary), step (median |shift| over the run [m], sign of the shift
+    going away from the robot in "sign"), idx ([k, 2] cells of the run on the boundary row)."""
+    nx, ny = elev.shape
+    e = np.where(ok, elev, np.nan)
+    s = np.full((nx, ny), np.nan)
+    with np.errstate(all="ignore"):
+        for i in range(w, nx - w + 1):
+            s[i] = np.nanmedian(e[i:i + w], 0) - np.nanmedian(e[i - w:i], 0)
+        d = np.full_like(s, np.nan)
+        d[2 * w:nx - 2 * w] = s[2 * w:nx - 2 * w] - 0.5 * (s[w:nx - 3 * w] + s[3 * w:nx - w])
+    cand = []
+    for i in np.nonzero((CX - 0.5 * ELEV_GRID["res"] > rng[0]) & (CX - 0.5 * ELEV_GRID["res"] < rng[1]))[0]:
+        for sign in (-1.0, 1.0):
+            hit = np.nan_to_num(sign * d[i], nan=-1.0) > thresh
+            j, runs = 0, []
+            while j < ny:
+                if not hit[j]:
+                    j += 1
+                    continue
+                k, last = j, j
+                while k + 1 < ny and (hit[k + 1] or (k + 1 + max_gap < ny and hit[k + 1:k + 2 + max_gap].any())):
+                    k += 1
+                    if hit[k]:
+                        last = k
+                runs.append((j, last))
+                j = k + 1
+            for j0, j1 in runs:
+                span = CY[j1] - CY[j0] + ELEV_GRID["res"]
+                if span >= min_span:
+                    cols = np.arange(j0, j1 + 1)
+                    cols = cols[hit[cols]]
+                    cand.append({"xr": float(CX[i] - 0.5 * ELEV_GRID["res"]), "span": float(span), "sign": sign,
+                                 "step": float(np.median(sign * d[i, cols])),
+                                 "idx": np.stack([np.full(len(cols), i), cols], 1)})
+    cand.sort(key=lambda c: -c["span"] * c["step"])
+    out = []
+    for c in cand:
+        if all(abs(c["xr"] - o["xr"]) > 0.3 for o in out):
+            out.append(c)
     return out
 
 
