@@ -14,6 +14,9 @@ Features (all optional, all deterministic from the params dict):
                 robot foot material, 0.8 static / 0.6 dynamic in the Go2 rough task)
   defects       list of sidewalk defects (upheaval, crack, hole, puddle, obstruction): see sim/defects.py.
                 Defect tiles use a finer grid (horizontal_scale 0.02, vertical_scale 0.001).
+  heightmap     measured terrain: path to an .npz from go2wm.scan.heightmap (or {"file": path}), sampled
+                bilinearly in scene coordinates and added to the analytic surface (edge values outside it).
+                Used for tiles recreated from real scans (scripts/scan_to_tile.py).
 
 `sidewalk_height(x, y, p)` is the analytic surface [m]; `sidewalk_heightfield` samples it on the
 Isaac grid. Both are pure numpy so they can be tested without the simulator.
@@ -21,6 +24,7 @@ Isaac grid. Both are pure numpy so they can be tested without the simulator.
 
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Any
 
 import numpy as np
@@ -34,6 +38,7 @@ DEFAULTS: dict[str, Any] = {
     "curb_drop": 0.0,
     "friction": 1.0,
     "defects": [],
+    "heightmap": None,
     "horizontal_scale": 0.05,
     "vertical_scale": 0.005,
 }
@@ -62,7 +67,30 @@ def sidewalk_height(x, y, p: dict[str, Any], grid: float = 0.0) -> np.ndarray:
         from .defects import defect_height
 
         z = z + defect_height(x, y, p["defects"], grid)
+    if p["heightmap"]:
+        z = z + heightmap_height(x, y, p["heightmap"])
     return z
+
+
+@lru_cache(maxsize=4)
+def _load_heightmap(path: str):
+    d = np.load(path)
+    return d["z"].astype(np.float64), float(d["res"]), float(d["x0"]), float(d["y0"])
+
+
+def heightmap_height(x, y, hm) -> np.ndarray:
+    """Bilinear sample of a measured heightmap (.npz: z[nx, ny], res, x0, y0) at scene coordinates; edge values
+    outside it. Pure numpy (the Isaac Python env has no scipy)."""
+    z, res, x0, y0 = _load_heightmap(str(hm["file"] if isinstance(hm, dict) else hm))
+    x, y = np.broadcast_arrays(np.asarray(x, dtype=np.float64), np.asarray(y, dtype=np.float64))
+    nx, ny = z.shape
+    u = np.clip((x - x0) / res, 0, nx - 1)
+    v = np.clip((y - y0) / res, 0, ny - 1)
+    i = np.minimum(np.floor(u).astype(np.int64), nx - 2)
+    j = np.minimum(np.floor(v).astype(np.int64), ny - 2)
+    fu, fv = u - i, v - j
+    return ((1 - fu) * (1 - fv) * z[i, j] + fu * (1 - fv) * z[i + 1, j]
+            + (1 - fu) * fv * z[i, j + 1] + fu * fv * z[i + 1, j + 1])
 
 
 def sidewalk_heightfield(size: tuple[float, float], horizontal_scale: float, vertical_scale: float,

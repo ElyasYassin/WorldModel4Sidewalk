@@ -929,9 +929,13 @@ def main() -> int:
                                                          for x in missed) + "  (revisit with a slower pass)",
                    font=F["b"], fill=RED)
             y += 28
-        d.text((70, y), "Cracks are detected as findings but not scored by width yet; people and cones are simulated "
-                        "obstacles (people known from ground truth, standing in for a person detector).",
-               font=F["s"], fill=GREY)
+        note = "Cracks are detected as findings but not scored by width yet"
+        if site.get("objects"):
+            note += ("; people and cones are simulated obstacles (people known from ground truth, standing in for a "
+                     "person detector)")
+        d.text((70, y), note + ".", font=F["s"], fill=GREY)
+        if r.get("score_reference"):  # "true" values measured, not authored (e.g. tiles recreated from a real scan)
+            d.text((70, y + 20), "True values: " + r["score_reference"] + ".", font=F["s"], fill=GREY)
 
     out = resolve_path(a.out)
     out.parent.mkdir(parents=True, exist_ok=True)
